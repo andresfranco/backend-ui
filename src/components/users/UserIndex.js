@@ -8,8 +8,7 @@ import {
   Tooltip
 } from '@mui/material';
 import { 
-  DataGrid, 
-  GridToolbarContainer,
+  DataGrid,
   GridToolbarQuickFilter,
   GridToolbarFilterButton
 } from '@mui/x-data-grid';
@@ -18,6 +17,7 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon
 } from '@mui/icons-material';
+import UserForm from './UserForm';
 
 // Temporary mock data - replace with API call
 const mockUsers = [
@@ -26,7 +26,7 @@ const mockUsers = [
   // Add more mock data as needed
 ];
 
-function CustomToolbar() {
+function CustomToolbar({ onCreateClick }) {
   return (
     <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
       <Tooltip title="Create new user" arrow placement="right">
@@ -35,7 +35,7 @@ function CustomToolbar() {
           variant="contained"
           color="primary"
           size="large"
-          onClick={() => {/* Handle new user */}}
+          onClick={onCreateClick}
           sx={{
             boxShadow: 2,
             backgroundColor: 'primary.dark',
@@ -72,6 +72,53 @@ function CustomToolbar() {
 
 function UserIndex() {
   const [pageSize, setPageSize] = useState(10);
+  const [formMode, setFormMode] = useState(null); // 'create', 'edit', or 'delete'
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const handleCreateClick = () => {
+    setFormMode('create');
+    setSelectedUser(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditClick = (user) => {
+    setFormMode('edit');
+    setSelectedUser(user);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteClick = (user) => {
+    setFormMode('delete');
+    setSelectedUser(user);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    setSelectedUser(null);
+    setFormMode(null);
+  };
+
+  const handleFormSubmit = (formData) => {
+    switch (formMode) {
+      case 'create':
+        console.log('Creating user:', formData);
+        // Add API call here
+        break;
+      case 'edit':
+        console.log('Updating user:', formData);
+        // Add API call here
+        break;
+      case 'delete':
+        console.log('Deleting user:', selectedUser.id);
+        // Add API call here
+        break;
+      default:
+        break;
+    }
+    handleFormClose();
+  };
 
   const columns = [
     { 
@@ -160,7 +207,7 @@ function UserIndex() {
             <IconButton
               color="primary"
               size="small"
-              onClick={() => {/* Handle edit */}}
+              onClick={() => handleEditClick(params.row)}
             >
               <EditIcon />
             </IconButton>
@@ -169,7 +216,7 @@ function UserIndex() {
             <IconButton
               color="error"
               size="small"
-              onClick={() => {/* Handle delete */}}
+              onClick={() => handleDeleteClick(params.row)}
             >
               <DeleteIcon />
             </IconButton>
@@ -188,16 +235,17 @@ function UserIndex() {
         <DataGrid
           rows={mockUsers}
           columns={columns}
-          pageSize={pageSize}
-          rowsPerPageOptions={[5, 10, 20]}
-          onPageSizeChange={setPageSize}
-          slots={{
-            toolbar: CustomToolbar,
-          }}
+          pageSizeOptions={[5, 10, 20]}
           initialState={{
             pagination: {
-              paginationModel: { pageSize: 10 },
+              paginationModel: { pageSize: 10, page: 0 },
             },
+          }}
+          onPaginationModelChange={(newModel) => {
+            setPageSize(newModel.pageSize);
+          }}
+          slots={{
+            toolbar: (props) => <CustomToolbar {...props} onCreateClick={handleCreateClick} />,
           }}
           slotProps={{
             toolbar: {
@@ -228,6 +276,14 @@ function UserIndex() {
           }}
         />
       </Paper>
+
+      <UserForm
+        open={isFormOpen}
+        onClose={handleFormClose}
+        user={selectedUser}
+        onSubmit={handleFormSubmit}
+        mode={formMode}
+      />
     </Box>
   );
 }

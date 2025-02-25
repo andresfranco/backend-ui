@@ -8,8 +8,7 @@ import {
   Tooltip
 } from '@mui/material';
 import { 
-  DataGrid, 
-  GridToolbarContainer,
+  DataGrid,
   GridToolbarQuickFilter,
   GridToolbarFilterButton
 } from '@mui/x-data-grid';
@@ -18,16 +17,34 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon
 } from '@mui/icons-material';
+import RoleForm from './RoleForm';
 
 // Temporary mock data - replace with API call
 const mockRoles = [
-  { id: 1, name: 'Administrator', description: 'Full system access', users: 2, permissions: 'All' },
-  { id: 2, name: 'User', description: 'Standard user access', users: 5, permissions: 'Limited' },
-  { id: 3, name: 'Manager', description: 'Department management access', users: 3, permissions: 'Extended' },
-  // Add more mock data as needed
+  { 
+    id: 1, 
+    name: 'Administrator', 
+    description: 'Full system access', 
+    users: 2, 
+    permissions: ['CREATE_USER', 'EDIT_USER', 'DELETE_USER', 'VIEW_USER', 'CREATE_ROLE', 'EDIT_ROLE', 'DELETE_ROLE', 'VIEW_ROLE'] 
+  },
+  { 
+    id: 2, 
+    name: 'User', 
+    description: 'Standard user access', 
+    users: 5, 
+    permissions: ['VIEW_USER', 'VIEW_ROLE'] 
+  },
+  { 
+    id: 3, 
+    name: 'Manager', 
+    description: 'Department management access', 
+    users: 3, 
+    permissions: ['CREATE_USER', 'EDIT_USER', 'VIEW_USER', 'VIEW_ROLE'] 
+  },
 ];
 
-function CustomToolbar() {
+function CustomToolbar({ onCreateClick }) {
   return (
     <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
       <Tooltip title="Create new role" arrow placement="right">
@@ -36,7 +53,7 @@ function CustomToolbar() {
           variant="contained"
           color="primary"
           size="large"
-          onClick={() => {/* Handle new role */}}
+          onClick={onCreateClick}
           sx={{
             boxShadow: 2,
             backgroundColor: 'primary.dark',
@@ -73,6 +90,53 @@ function CustomToolbar() {
 
 function RoleIndex() {
   const [pageSize, setPageSize] = useState(10);
+  const [formMode, setFormMode] = useState(null); // 'create', 'edit', or 'delete'
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const handleCreateClick = () => {
+    setFormMode('create');
+    setSelectedRole(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditClick = (role) => {
+    setFormMode('edit');
+    setSelectedRole(role);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteClick = (role) => {
+    setFormMode('delete');
+    setSelectedRole(role);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    setSelectedRole(null);
+    setFormMode(null);
+  };
+
+  const handleFormSubmit = (formData) => {
+    switch (formMode) {
+      case 'create':
+        console.log('Creating role:', formData);
+        // Add API call here
+        break;
+      case 'edit':
+        console.log('Updating role:', formData);
+        // Add API call here
+        break;
+      case 'delete':
+        console.log('Deleting role:', selectedRole.id);
+        // Add API call here
+        break;
+      default:
+        break;
+    }
+    handleFormClose();
+  };
 
   const columns = [
     { 
@@ -146,6 +210,11 @@ function RoleIndex() {
             Level of access
           </Typography>
         </Box>
+      ),
+      renderCell: (params) => (
+        <Typography>
+          {params.row.permissions.length} Permission{params.row.permissions.length !== 1 ? 's' : ''}
+        </Typography>
       )
     },
     {
@@ -162,7 +231,7 @@ function RoleIndex() {
             <IconButton
               color="primary"
               size="small"
-              onClick={() => {/* Handle edit */}}
+              onClick={() => handleEditClick(params.row)}
             >
               <EditIcon />
             </IconButton>
@@ -171,7 +240,7 @@ function RoleIndex() {
             <IconButton
               color="error"
               size="small"
-              onClick={() => {/* Handle delete */}}
+              onClick={() => handleDeleteClick(params.row)}
             >
               <DeleteIcon />
             </IconButton>
@@ -190,16 +259,17 @@ function RoleIndex() {
         <DataGrid
           rows={mockRoles}
           columns={columns}
-          pageSize={pageSize}
-          rowsPerPageOptions={[5, 10, 20]}
-          onPageSizeChange={setPageSize}
-          slots={{
-            toolbar: CustomToolbar,
-          }}
+          pageSizeOptions={[5, 10, 20]}
           initialState={{
             pagination: {
-              paginationModel: { pageSize: 10 },
+              paginationModel: { pageSize: 10, page: 0 },
             },
+          }}
+          onPaginationModelChange={(newModel) => {
+            setPageSize(newModel.pageSize);
+          }}
+          slots={{
+            toolbar: (props) => <CustomToolbar {...props} onCreateClick={handleCreateClick} />,
           }}
           slotProps={{
             toolbar: {
@@ -230,6 +300,14 @@ function RoleIndex() {
           }}
         />
       </Paper>
+
+      <RoleForm
+        open={isFormOpen}
+        onClose={handleFormClose}
+        role={selectedRole}
+        onSubmit={handleFormSubmit}
+        mode={formMode}
+      />
     </Box>
   );
 }
