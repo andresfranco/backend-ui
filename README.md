@@ -1,4 +1,6 @@
-# Getting Started with Create React App
+# Backend UI - Admin Panel
+
+This is a React 19 admin panel application with user and role management features.
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
