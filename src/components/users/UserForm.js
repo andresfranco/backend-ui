@@ -11,34 +11,58 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Typography
+  Typography,
+  Chip,
+  Stack,
+  Alert
 } from '@mui/material';
-
-// Mock roles data - replace with API call
-const availableRoles = [
-  { id: 1, name: 'Administrator' },
-  { id: 2, name: 'User' },
-  { id: 3, name: 'Manager' }
-];
 
 function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
-    role: '',
-    ...user
+    roles: []
   });
   const [errors, setErrors] = useState({});
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [apiError, setApiError] = useState('');
+
+  useEffect(() => {
+    fetchRoles();
+  }, []);
 
   useEffect(() => {
     if (user) {
       setFormData({
-        ...user,
-        password: '' // Don't populate password in edit mode
+        username: user.username || '',
+        email: user.email || '',
+        password: '', // Don't populate password in edit mode
+        roles: Array.isArray(user.roles) ? user.roles : []
+      });
+    } else {
+      setFormData({
+        username: '',
+        email: '',
+        password: '',
+        roles: []
       });
     }
   }, [user]);
+
+  const fetchRoles = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/roles/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch roles');
+      }
+      const data = await response.json();
+      setAvailableRoles(data);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      setApiError('Failed to load roles');
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -53,8 +77,8 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
     if (mode === 'create' && !formData.password) {
       newErrors.password = 'Password is required';
     }
-    if (!formData.role) {
-      newErrors.role = 'Role is required';
+    if (formData.roles.length === 0) {
+      newErrors.roles = 'At least one role is required';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -62,9 +86,9 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setApiError('');
     if (validateForm()) {
       onSubmit(formData);
-      onClose();
     }
   };
 
@@ -82,6 +106,25 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
     }
   };
 
+  const handleRoleChange = (event) => {
+    const selectedRoleIds = event.target.value;
+    const selectedRoles = availableRoles.filter(role => 
+      selectedRoleIds.includes(role.id)
+    );
+    
+    setFormData(prev => ({
+      ...prev,
+      roles: selectedRoles
+    }));
+
+    if (errors.roles) {
+      setErrors(prev => ({
+        ...prev,
+        roles: ''
+      }));
+    }
+  };
+
   return (
     <Dialog 
       open={open} 
@@ -90,10 +133,15 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
       fullWidth
     >
       <DialogTitle>
-        {mode === 'create' ? 'Create New User' : 'Edit User'}
+        {mode === 'create' ? 'Create New User' : mode === 'edit' ? 'Edit User' : 'Delete User'}
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent>
+          {apiError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {apiError}
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               fullWidth
@@ -126,29 +174,43 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
                 onChange={handleChange}
                 error={!!errors.password}
                 helperText={errors.password}
+                required={mode === 'create'}
               />
             )}
-            <FormControl fullWidth error={!!errors.role}>
-              <InputLabel>Role</InputLabel>
+            <FormControl fullWidth error={!!errors.roles}>
+              <InputLabel>Roles</InputLabel>
               <Select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                label="Role"
+                multiple
+                name="roles"
+                value={formData.roles.map(role => role.id)}
+                onChange={handleRoleChange}
+                label="Roles"
                 disabled={mode === 'delete'}
+                renderValue={(selected) => (
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" gap={0.5}>
+                    {formData.roles.map((role) => (
+                      <Chip key={role.id} label={role.name} size="small" />
+                    ))}
+                  </Stack>
+                )}
               >
-                {availableRoles.map(role => (
-                  <MenuItem key={role.id} value={role.name}>
+                {availableRoles.map((role) => (
+                  <MenuItem key={role.id} value={role.id}>
                     {role.name}
                   </MenuItem>
                 ))}
               </Select>
-              {errors.role && (
+              {errors.roles && (
                 <Typography variant="caption" color="error">
-                  {errors.role}
+                  {errors.roles}
                 </Typography>
               )}
             </FormControl>
+            {mode === 'delete' && (
+              <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+                Are you sure you want to delete this user? This action cannot be undone.
+              </Typography>
+            )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

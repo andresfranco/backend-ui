@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Paper, 
   Typography,
   IconButton,
   Button,
-  Tooltip
+  Tooltip,
+  Chip
 } from '@mui/material';
 import { 
   DataGrid,
@@ -18,13 +19,6 @@ import {
   Add as AddIcon
 } from '@mui/icons-material';
 import UserForm from './UserForm';
-
-// Temporary mock data - replace with API call
-const mockUsers = [
-  { id: 1, username: 'admin', email: 'admin@example.com', role: 'Administrator', lastLogin: '2024-02-24' },
-  { id: 2, username: 'user1', email: 'user1@example.com', role: 'User', lastLogin: '2024-02-23' },
-  // Add more mock data as needed
-];
 
 function CustomToolbar({ onCreateClick }) {
   return (
@@ -75,6 +69,38 @@ function UserIndex() {
   const [formMode, setFormMode] = useState(null); // 'create', 'edit', or 'delete'
   const [selectedUser, setSelectedUser] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://127.0.0.1:8000/api/users/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      const data = await response.json();
+      // Ensure each user has the required properties
+      const processedData = data.map(user => ({
+        id: user.id,
+        username: user.username || '',
+        email: user.email || '',
+        roles: Array.isArray(user.roles) ? user.roles : []
+      }));
+      setUsers(processedData);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load users');
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateClick = () => {
     setFormMode('create');
@@ -100,24 +126,62 @@ function UserIndex() {
     setFormMode(null);
   };
 
-  const handleFormSubmit = (formData) => {
-    switch (formMode) {
-      case 'create':
-        console.log('Creating user:', formData);
-        // Add API call here
-        break;
-      case 'edit':
-        console.log('Updating user:', formData);
-        // Add API call here
-        break;
-      case 'delete':
-        console.log('Deleting user:', selectedUser.id);
-        // Add API call here
-        break;
-      default:
-        break;
+  const handleFormSubmit = async (formData) => {
+    try {
+      let response;
+      switch (formMode) {
+        case 'create':
+          response = await fetch('http://127.0.0.1:8000/api/users/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: formData.username,
+              email: formData.email,
+              password: formData.password,
+              roles: formData.roles.map(role => role.id)
+            })
+          });
+          break;
+          
+        case 'edit':
+          response = await fetch(`http://127.0.0.1:8000/api/users/${selectedUser.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: formData.username,
+              email: formData.email,
+              ...(formData.password && { password: formData.password }),
+              roles: formData.roles.map(role => role.id)
+            })
+          });
+          break;
+          
+        case 'delete':
+          response = await fetch(`http://127.0.0.1:8000/api/users/${selectedUser.id}`, {
+            method: 'DELETE'
+          });
+          break;
+
+        default:
+          return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Operation failed');
+      }
+
+      // Refresh the users list after successful operation
+      await fetchUsers();
+      handleFormClose();
+    } catch (error) {
+      console.error('Operation failed:', error);
+      setError(error.message);
     }
-    handleFormClose();
   };
 
   const columns = [
@@ -158,40 +222,42 @@ function UserIndex() {
       )
     },
     { 
-      field: 'role', 
-      headerName: 'Role',
-      description: 'User assigned role', // Added label
+      field: 'roles', 
+      headerName: 'Roles',
+      description: 'User assigned roles', // Added label
       flex: 1, 
       minWidth: 120,
       filterable: true,  // Enabled filter
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
-            Role
+            Roles
           </Typography>
           <Typography variant="caption" color="textSecondary">
-            User assigned role
+            User assigned roles
           </Typography>
         </Box>
-      )
-    },
-    { 
-      field: 'lastLogin', 
-      headerName: 'Last Login',
-      description: 'Last login date', // Added label
-      flex: 1, 
-      minWidth: 130,
-      filterable: true,  // Enabled filter
-      renderHeader: (params) => (
-        <Box>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Last Login
-          </Typography>
-          <Typography variant="caption" color="textSecondary">
-            Last login date
-          </Typography>
-        </Box>
-      )
+      ),
+      renderCell: (params) => {
+        const userRoles = params.row.roles || [];
+        return (
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+            {userRoles.map((role) => (
+              <Chip
+                key={role.id}
+                label={role.name}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+            ))}
+          </Box>
+        );
+      },
+      valueGetter: (params) => {
+        if (!params.row) return [];
+        return params.row.roles || [];
+      }
     },
     {
       field: 'actions',
@@ -233,7 +299,7 @@ function UserIndex() {
       </Typography>
       <Paper sx={{ height: 'calc(100vh - 180px)', width: '100%' }}>
         <DataGrid
-          rows={mockUsers}
+          rows={users}
           columns={columns}
           pageSizeOptions={[5, 10, 20]}
           initialState={{
@@ -244,8 +310,19 @@ function UserIndex() {
           onPaginationModelChange={(newModel) => {
             setPageSize(newModel.pageSize);
           }}
+          loading={loading}
+          error={error}
           slots={{
             toolbar: (props) => <CustomToolbar {...props} onCreateClick={handleCreateClick} />,
+            noRowsOverlay: () => (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                {error ? (
+                  <Typography color="error">{error}</Typography>
+                ) : (
+                  <Typography>No users found</Typography>
+                )}
+              </Box>
+            ),
           }}
           slotProps={{
             toolbar: {
