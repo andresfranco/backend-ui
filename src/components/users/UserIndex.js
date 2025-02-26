@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Box, 
   Paper, 
@@ -6,101 +6,379 @@ import {
   IconButton,
   Button,
   Tooltip,
-  Chip
+  Chip,
+  TextField,
+  Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { 
-  DataGrid,
-  GridToolbarQuickFilter,
-  GridToolbarFilterButton
+  DataGrid
 } from '@mui/x-data-grid';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Search as SearchIcon,
+  AddCircleOutline as AddFilterIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import UserForm from './UserForm';
+import { debounce } from '@mui/material/utils';
 
-function CustomToolbar({ onCreateClick }) {
-  return (
-    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-      <Tooltip title="Create new user" arrow placement="right">
-        <Button
-          startIcon={<AddIcon />}
-          variant="contained"
-          color="primary"
-          size="large"
-          onClick={onCreateClick}
-          sx={{
-            boxShadow: 2,
-            backgroundColor: 'primary.dark',
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-              boxShadow: 4,
-            },
-            fontWeight: 'bold',
-            px: 3,
-            py: 1
-          }}
-        >
-          New User
-        </Button>
-      </Tooltip>
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flex: 1, maxWidth: 500 }}>
-        <GridToolbarQuickFilter 
-          fullWidth
-          variant="outlined"
-          size="small"
-          placeholder="Search in all columns..."
-          sx={{ 
-            mt: 0,
-            '& .MuiInputBase-root': {
-              backgroundColor: 'background.paper',
-            }
-          }}
-        />
-        <GridToolbarFilterButton />
-      </Box>
-    </Box>
-  );
-}
+// Filter type definitions
+const FILTER_TYPES = {
+  username: {
+    label: 'Username',
+    type: 'text'
+  },
+  email: {
+    label: 'Email',
+    type: 'text'
+  },
+  roles: {
+    label: 'Roles',
+    type: 'roles'
+  }
+};
 
-function UserIndex() {
-  const [pageSize, setPageSize] = useState(10);
-  const [formMode, setFormMode] = useState(null); // 'create', 'edit', or 'delete'
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const CustomToolbar = React.memo(({ onCreateClick, filters, onFiltersChange, onSearch }) => {
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [activeFilters, setActiveFilters] = useState([{ id: 1, type: 'username' }]);
+  const [nextFilterId, setNextFilterId] = useState(2);
 
+  // Add role filter condition state
+  const [roleFilterCondition, setRoleFilterCondition] = useState('OR');
+
+  // Fetch available roles
   useEffect(() => {
-    fetchUsers();
+    fetch('http://127.0.0.1:8000/api/roles/')
+      .then(response => response.json())
+      .then(data => {
+        setAvailableRoles(data);
+      })
+      .catch(error => console.error('Error fetching roles:', error));
   }, []);
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('http://127.0.0.1:8000/api/users/');
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-      const data = await response.json();
-      // Ensure each user has the required properties
-      const processedData = data.map(user => ({
-        id: user.id,
-        username: user.username || '',
-        email: user.email || '',
-        roles: Array.isArray(user.roles) ? user.roles : []
-      }));
-      setUsers(processedData);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load users');
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoading(false);
+  const handleAddFilter = () => {
+    const unusedFilterTypes = Object.keys(FILTER_TYPES).filter(type => 
+      !activeFilters.some(f => f.type === type)
+    );
+
+    if (unusedFilterTypes.length > 0) {
+      setActiveFilters([...activeFilters, { id: nextFilterId, type: unusedFilterTypes[0] }]);
+      setNextFilterId(nextFilterId + 1);
     }
   };
+
+  const handleRemoveFilter = (filterId) => {
+    const updatedFilters = activeFilters.filter(f => f.id !== filterId);
+    setActiveFilters(updatedFilters);
+    
+    // Clear the removed filter's value
+    const removedFilter = activeFilters.find(f => f.id === filterId);
+    if (removedFilter) {
+      onFiltersChange({
+        ...filters,
+        [removedFilter.type]: undefined
+      });
+    }
+  };
+
+  const handleFilterChange = (filterId, value) => {
+    const filter = activeFilters.find(f => f.id === filterId);
+    if (filter) {
+      onFiltersChange({
+        ...filters,
+        [filter.type]: value,
+        ...(filter.type === 'roles' ? { roleFilterCondition } : {})
+      });
+    }
+  };
+
+  const handleFilterTypeChange = (filterId, newType) => {
+    setActiveFilters(activeFilters.map(f => 
+      f.id === filterId ? { ...f, type: newType } : f
+    ));
+    
+    // Clear the old filter value
+    const oldFilter = activeFilters.find(f => f.id === filterId);
+    if (oldFilter) {
+      onFiltersChange({
+        ...filters,
+        [oldFilter.type]: undefined
+      });
+    }
+  };
+
+  const handleRoleFilterConditionChange = (event, newCondition) => {
+    if (newCondition !== null) {
+      setRoleFilterCondition(newCondition);
+      // Update filters to include the new condition
+      if (filters.roles?.length > 0) {
+        onFiltersChange({
+          ...filters,
+          roleFilterCondition: newCondition
+        });
+      }
+    }
+  };
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Stack spacing={2}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Tooltip title="Create new user" arrow placement="right">
+            <Button
+              startIcon={<AddIcon />}
+              variant="contained"
+              color="primary"
+              size="large"
+              onClick={onCreateClick}
+              sx={{
+                boxShadow: 2,
+                backgroundColor: 'primary.dark',
+                '&:hover': {
+                  backgroundColor: 'primary.dark',
+                  boxShadow: 4,
+                },
+                fontWeight: 'bold',
+                px: 3,
+                py: 1
+              }}
+            >
+              New User
+            </Button>
+          </Tooltip>
+        </Box>
+        
+        {/* Filter Section */}
+        <Paper sx={{ p: 2 }}>
+          <Stack spacing={2}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="subtitle1" fontWeight="bold">
+                Filters
+              </Typography>
+              {Object.keys(FILTER_TYPES).length > activeFilters.length && (
+                <Tooltip title="Add filter">
+                  <IconButton onClick={handleAddFilter} color="primary">
+                    <AddFilterIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+            <Stack spacing={2}>
+              {activeFilters.map((filter) => (
+                <Box key={filter.id} sx={{ display: 'flex', gap: 2, alignItems: 'start' }}>
+                  <FormControl sx={{ minWidth: 150 }}>
+                    <InputLabel>Filter Type</InputLabel>
+                    <Select
+                      value={filter.type}
+                      onChange={(e) => handleFilterTypeChange(filter.id, e.target.value)}
+                      size="small"
+                      label="Filter Type"
+                    >
+                      {Object.entries(FILTER_TYPES).map(([type, config]) => (
+                        <MenuItem
+                          key={type}
+                          value={type}
+                          disabled={activeFilters.some(f => f.id !== filter.id && f.type === type)}
+                        >
+                          {config.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {filter.type === 'roles' ? (
+                    <Box sx={{ display: 'flex', flex: 1, gap: 2, alignItems: 'start' }}>
+                      <FormControl sx={{ flex: 1 }}>
+                        <InputLabel>Select Roles</InputLabel>
+                        <Select
+                          multiple
+                          value={filters.roles || []}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          label="Select Roles"
+                          size="small"
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => (
+                                <Chip
+                                  key={value}
+                                  label={availableRoles.find(role => role.id === value)?.name}
+                                  size="small"
+                                />
+                              ))}
+                            </Box>
+                          )}
+                        >
+                          {availableRoles.map((role) => (
+                            <MenuItem key={role.id} value={role.id}>
+                              {role.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      {filters.roles?.length > 1 && (
+                        <ToggleButtonGroup
+                          value={roleFilterCondition}
+                          exclusive
+                          onChange={handleRoleFilterConditionChange}
+                          size="small"
+                          sx={{ mt: 1 }}
+                        >
+                          <ToggleButton value="OR" aria-label="OR condition">
+                            OR
+                          </ToggleButton>
+                          <ToggleButton value="AND" aria-label="AND condition">
+                            AND
+                          </ToggleButton>
+                        </ToggleButtonGroup>
+                      )}
+                    </Box>
+                  ) : (
+                    <TextField
+                      label={FILTER_TYPES[filter.type].label}
+                      size="small"
+                      value={filters[filter.type] || ''}
+                      onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                      sx={{ flex: 1 }}
+                    />
+                  )}
+
+                  <IconButton 
+                    onClick={() => handleRemoveFilter(filter.id)}
+                    sx={{ mt: 1 }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+              ))}
+            </Stack>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={<SearchIcon />}
+                onClick={onSearch}
+                sx={{ minWidth: 120 }}
+              >
+                Search
+              </Button>
+            </Box>
+          </Stack>
+        </Paper>
+      </Stack>
+    </Box>
+  );
+});
+
+function UserIndex() {
+  // Update filters state to handle role IDs and condition
+  const [filters, setFilters] = useState({
+    username: '',
+    email: '',
+    roles: [],
+    roleFilterCondition: 'OR'
+  });
+
+  const [users, setUsers] = useState([]);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sortModel, setSortModel] = useState([]);
+  const [paginationModel, setPaginationModel] = useState({
+    pageSize: 10,
+    page: 0,
+  });
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const fetchData = useCallback((searchFilters = filters) => {
+    const params = new URLSearchParams({
+      page: paginationModel.page + 1,
+      pageSize: paginationModel.pageSize
+    });
+
+    // Add non-empty filters to params
+    Object.entries(searchFilters).forEach(([key, value]) => {
+      if (key === 'roles' || key === 'roleFilterCondition') {
+        // Skip roles filter as it's handled client-side
+        return;
+      }
+      if (value && typeof value === 'string' && value.trim()) {
+        params.append('filterField', key);
+        params.append('filterValue', value.trim());
+        params.append('filterOperator', 'contains');
+      }
+    });
+
+    if (sortModel.length > 0) {
+      params.append('sortField', sortModel[0].field);
+      params.append('sortOrder', sortModel[0].sort);
+    }
+
+    setLoading(true);
+    return fetch(`http://127.0.0.1:8000/api/users/?${params}`)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch users');
+        return response.json();
+      })
+      .then(data => {
+        // If we have role filters active, filter the results client-side
+        let filteredData = data.items;
+        if (searchFilters.roles?.length > 0) {
+          filteredData = data.items.filter(user => {
+            const userRoleIds = user.roles.map(r => r.id);
+            
+            if (searchFilters.roleFilterCondition === 'AND') {
+              // AND condition: user must have ALL selected roles
+              return searchFilters.roles.every(roleId => 
+                userRoleIds.includes(roleId)
+              );
+            } else {
+              // OR condition: user must have ANY of the selected roles
+              return searchFilters.roles.some(roleId => 
+                userRoleIds.includes(roleId)
+              );
+            }
+          });
+        }
+
+        setUsers(filteredData.map(user => ({
+          id: user.id,
+          username: user.username || '',
+          email: user.email || '',
+          roles: Array.isArray(user.roles) ? 
+            user.roles.map(role => ({
+              id: role.id,
+              name: role.name || ''
+            })) : []
+        })));
+        setTotalUsers(searchFilters.roles?.length > 0 ? filteredData.length : data.total || 0);
+        setError(null);
+      })
+      .catch(err => {
+        console.error('Error fetching users:', err);
+        setError('Failed to load users');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [paginationModel.page, paginationModel.pageSize, sortModel]);
+
+  // Handle search button click
+  const handleSearch = useCallback(() => {
+    fetchData(filters);
+  }, [filters, fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleCreateClick = () => {
     setFormMode('create');
@@ -176,7 +454,7 @@ function UserIndex() {
       }
 
       // Refresh the users list after successful operation
-      await fetchUsers();
+      await fetchData();
       handleFormClose();
     } catch (error) {
       console.error('Operation failed:', error);
@@ -188,10 +466,10 @@ function UserIndex() {
     { 
       field: 'username', 
       headerName: 'Username',
-      description: 'User account name', // Added label
+      description: 'User account name',
       flex: 1, 
       minWidth: 130,
-      filterable: true,  // Enabled filter
+      filterable: false,
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
@@ -206,10 +484,10 @@ function UserIndex() {
     { 
       field: 'email', 
       headerName: 'Email',
-      description: 'User email address', // Added label
+      description: 'User email address',
       flex: 1.5, 
       minWidth: 200,
-      filterable: true,  // Enabled filter
+      filterable: false,
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
@@ -224,10 +502,14 @@ function UserIndex() {
     { 
       field: 'roles', 
       headerName: 'Roles',
-      description: 'User assigned roles', // Added label
+      description: 'User assigned roles',
       flex: 1, 
       minWidth: 120,
-      filterable: true,  // Enabled filter
+      filterable: false,
+      valueGetter: (params) => {
+        if (!params.row?.roles) return '';
+        return params.row.roles.map(role => role.name).join(', ');
+      },
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
@@ -239,10 +521,10 @@ function UserIndex() {
         </Box>
       ),
       renderCell: (params) => {
-        const userRoles = params.row.roles || [];
+        if (!params.row?.roles) return null;
         return (
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            {userRoles.map((role) => (
+            {params.row.roles.map((role) => (
               <Chip
                 key={role.id}
                 label={role.name}
@@ -253,10 +535,6 @@ function UserIndex() {
             ))}
           </Box>
         );
-      },
-      valueGetter: (params) => {
-        if (!params.row) return [];
-        return params.row.roles || [];
       }
     },
     {
@@ -301,42 +579,31 @@ function UserIndex() {
         <DataGrid
           rows={users}
           columns={columns}
-          pageSizeOptions={[5, 10, 20]}
-          initialState={{
-            pagination: {
-              paginationModel: { pageSize: 10, page: 0 },
-            },
-          }}
-          onPaginationModelChange={(newModel) => {
-            setPageSize(newModel.pageSize);
-          }}
+          rowCount={totalUsers}
           loading={loading}
-          error={error}
+          pageSizeOptions={[5, 10, 20]}
+          paginationMode="server"
+          sortingMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={(newModel) => {
+            setPaginationModel(newModel);
+          }}
+          onSortModelChange={(newSortModel) => {
+            setSortModel(newSortModel);
+          }}
+          disableColumnFilter
+          disableColumnMenu
           slots={{
-            toolbar: (props) => <CustomToolbar {...props} onCreateClick={handleCreateClick} />,
-            noRowsOverlay: () => (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                {error ? (
-                  <Typography color="error">{error}</Typography>
-                ) : (
-                  <Typography>No users found</Typography>
-                )}
-              </Box>
-            ),
+            toolbar: CustomToolbar
           }}
           slotProps={{
             toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { 
-                debounceMs: 500,
-                variant: "outlined"
-              },
-            },
+              filters,
+              onFiltersChange: setFilters,
+              onSearch: handleSearch,
+              onCreateClick: handleCreateClick
+            }
           }}
-          filterMode="client"
-          disableColumnFilter={false}
-          disableDensitySelector
-          disableColumnSelector
           autoHeight
           getRowHeight={() => 'auto'}
           sx={{
