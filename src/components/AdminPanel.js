@@ -12,10 +12,12 @@ import {
 } from '@mui/material';
 import {
   People as PeopleIcon,
-  VpnKey as VpnKeyIcon
+  VpnKey as VpnKeyIcon,
+  LockPerson as PermissionIcon
 } from '@mui/icons-material';
 import UserIndex from './users/UserIndex';
 import RoleIndex from './roles/RoleIndex';
+import PermissionIndex from './permissions/PermissionIndex';
 
 const drawerWidth = 240;
 
@@ -25,7 +27,8 @@ function AdminPanel() {
 
   const menuItems = [
     { text: 'Users', icon: <PeopleIcon />, path: '/users' },
-    { text: 'Roles', icon: <VpnKeyIcon />, path: '/roles' }
+    { text: 'Roles', icon: <VpnKeyIcon />, path: '/roles' },
+    { text: 'Permissions', icon: <PermissionIcon />, path: '/permissions' }
   ];
 
   return (
@@ -89,6 +92,7 @@ function AdminPanel() {
           <Routes>
             <Route path="users" element={<UserIndex />} />
             <Route path="roles" element={<RoleIndex />} />
+            <Route path="permissions" element={<PermissionIndex />} />
             <Route path="/" element={
               <Typography variant="h4" component="h1" sx={{ mb: 4 }}>
                 Welcome to the Dashboard

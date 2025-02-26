@@ -1,98 +1,327 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
-  Box, 
-  Paper, 
+  Box,
   Typography,
   IconButton,
-  Button,
-  Tooltip
+  Tooltip,
 } from '@mui/material';
-import { 
-  DataGrid,
-  GridToolbarQuickFilter,
-  GridToolbarFilterButton
-} from '@mui/x-data-grid';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Add as AddIcon
 } from '@mui/icons-material';
 import RoleForm from './RoleForm';
-
-// Temporary mock data - replace with API call
-const mockRoles = [
-  { 
-    id: 1, 
-    name: 'Administrator', 
-    description: 'Full system access', 
-    users: 2, 
-    permissions: ['CREATE_USER', 'EDIT_USER', 'DELETE_USER', 'VIEW_USER', 'CREATE_ROLE', 'EDIT_ROLE', 'DELETE_ROLE', 'VIEW_ROLE'] 
-  },
-  { 
-    id: 2, 
-    name: 'User', 
-    description: 'Standard user access', 
-    users: 5, 
-    permissions: ['VIEW_USER', 'VIEW_ROLE'] 
-  },
-  { 
-    id: 3, 
-    name: 'Manager', 
-    description: 'Department management access', 
-    users: 3, 
-    permissions: ['CREATE_USER', 'EDIT_USER', 'VIEW_USER', 'VIEW_ROLE'] 
-  },
-];
-
-function CustomToolbar({ onCreateClick }) {
-  return (
-    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-      <Tooltip title="Create new role" arrow placement="right">
-        <Button
-          startIcon={<AddIcon />}
-          variant="contained"
-          color="primary"
-          size="large"
-          onClick={onCreateClick}
-          sx={{
-            boxShadow: 2,
-            backgroundColor: 'primary.dark',
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-              boxShadow: 4,
-            },
-            fontWeight: 'bold',
-            px: 3,
-            py: 1
-          }}
-        >
-          New Role
-        </Button>
-      </Tooltip>
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flex: 1, maxWidth: 500 }}>
-        <GridToolbarQuickFilter 
-          fullWidth
-          variant="outlined"
-          size="small"
-          placeholder="Search in all columns..."
-          sx={{ 
-            mt: 0,
-            '& .MuiInputBase-root': {
-              backgroundColor: 'background.paper',
-            }
-          }}
-        />
-        <GridToolbarFilterButton />
-      </Box>
-    </Box>
-  );
-}
+import GenericDataGrid from '../common/GenericDataGrid';
+import RoleFilters from './RoleFilters';
 
 function RoleIndex() {
-  const [pageSize, setPageSize] = useState(10);
-  const [formMode, setFormMode] = useState(null); // 'create', 'edit', or 'delete'
-  const [selectedRole, setSelectedRole] = useState(null);
+  const [filters, setFilters] = useState({
+    name: '',
+    description: '',
+    permission: ''
+  });
+
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sortModel, setSortModel] = useState([]);
+  const [paginationModel, setPaginationModel] = useState({
+    pageSize: 10,
+    page: 0,
+  });
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState(null);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [totalUsers, setTotalUsers] = useState(0);
+
+  const fetchData = useCallback((searchFilters = filters) => {
+    const params = new URLSearchParams({
+      page: paginationModel.page + 1,
+      pageSize: paginationModel.pageSize
+    });
+
+    // Add non-empty filters to params
+    Object.entries(searchFilters).forEach(([key, value]) => {
+      if (value && value.toString().trim()) {
+        if (key === 'permission') {
+          // Handle permission filter differently
+          params.append('filterField', 'permissions');
+          params.append('filterValue', value.toString().trim());
+          params.append('filterOperator', 'contains');
+        } else {
+          params.append('filterField', key);
+          params.append('filterValue', value.toString().trim());
+          params.append('filterOperator', 'contains');
+        }
+      }
+    });
+
+    if (sortModel.length > 0) {
+      params.append('sortField', sortModel[0].field);
+      params.append('sortOrder', sortModel[0].sort);
+    }
+
+    console.log('Fetching roles with params:', params.toString());
+    setLoading(true);
+    
+    // Use the /full endpoint like the permissions component
+    return fetch(`http://127.0.0.1:8000/api/roles/full?${params}`)
+      .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setRoles([]);
+            setTotalUsers(0);
+            return null;
+          }
+          throw new Error(`Failed to fetch roles: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data) {
+          console.log('Received roles data:', data);
+          setRoles(data.items.map(role => ({
+            id: role.id,
+            name: role.name || '',
+            description: role.description || '',
+            // Ensure permissions is always an array, even if it's null or undefined
+            permissions: Array.isArray(role.permissions) ? role.permissions : [],
+            // Ensure users is always an integer
+            users: typeof role.users === 'number' ? role.users : 
+                  Array.isArray(role.users) ? role.users.length : 0
+          })));
+          setTotalUsers(data.total || 0);
+          setError(null);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching roles:', err);
+        setError('Failed to load roles');
+        setRoles([]);
+        setTotalUsers(0);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [paginationModel.page, paginationModel.pageSize, sortModel]);
+
+  // Handle filter changes
+  const handleFiltersChange = (newFilters) => {
+    console.log('Filters changed:', newFilters);
+    setFilters(newFilters);
+    
+    // Only auto-refresh if ALL filters are empty
+    const hasActiveFilters = Object.values(newFilters).some(value => 
+      value && value.toString().trim() !== ''
+    );
+    
+    if (!hasActiveFilters) {
+      console.log('All filters are empty, auto-refreshing grid');
+      setPaginationModel(prevModel => ({
+        ...prevModel,
+        page: 0
+      }));
+      
+      // Use the fetchData function with empty filters
+      const params = new URLSearchParams({
+        page: 1, // Reset to first page
+        pageSize: paginationModel.pageSize
+      });
+
+      if (sortModel.length > 0) {
+        params.append('sortField', sortModel[0].field);
+        params.append('sortOrder', sortModel[0].sort);
+      }
+
+      console.log('Fetching all roles with params:', params.toString());
+      setLoading(true);
+      
+      fetch(`http://127.0.0.1:8000/api/roles/full?${params.toString()}`)
+        .then(response => {
+          if (!response.ok) {
+            if (response.status === 404) {
+              setRoles([]);
+              setTotalUsers(0);
+              return null;
+            }
+            throw new Error(`Failed to fetch roles: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data) {
+            const formattedRoles = data.items.map(role => ({
+              id: role.id,
+              name: role.name || '',
+              description: role.description || '',
+              permissions: Array.isArray(role.permissions) ? role.permissions : [],
+              users: typeof role.users === 'number' ? role.users : 
+                    Array.isArray(role.users) ? role.users.length : 0
+            }));
+            
+            setRoles(formattedRoles);
+            setTotalUsers(data.total || 0);
+            setError(null);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching roles:', err);
+          setError('Failed to load roles');
+          setRoles([]);
+          setTotalUsers(0);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  };
+
+  // Handle search button click
+  const handleSearch = useCallback(() => {
+    console.log('Search clicked with filters:', filters);
+    
+    // Reset to first page when searching
+    setPaginationModel(prevModel => ({
+      ...prevModel,
+      page: 0
+    }));
+    
+    // Build query parameters with current filters
+    const params = new URLSearchParams({
+      page: 1, // Reset to first page
+      pageSize: paginationModel.pageSize
+    });
+
+    // Add sorting if available
+    if (sortModel.length > 0) {
+      params.append('sortField', sortModel[0].field);
+      params.append('sortOrder', sortModel[0].sort);
+    }
+
+    // Add non-empty filters to params
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && value.toString().trim()) {
+        if (key === 'permission') {
+          // Handle permission filter differently
+          params.append('filterField', 'permissions');
+          params.append('filterValue', value.toString().trim());
+          params.append('filterOperator', 'contains');
+        } else {
+          params.append('filterField', key);
+          params.append('filterValue', value.toString().trim());
+          params.append('filterOperator', 'contains');
+        }
+      }
+    });
+
+    console.log('Searching roles with params:', params.toString());
+    setLoading(true);
+    
+    const apiUrl = `http://127.0.0.1:8000/api/roles/full?${params}`;
+    console.log('Search API URL:', apiUrl);
+    
+    fetch(apiUrl)
+      .then(response => {
+        console.log('Search response status:', response.status);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setRoles([]);
+            setTotalUsers(0);
+            return null;
+          }
+          throw new Error(`Failed to fetch roles: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data) {
+          console.log('Received search results:', data);
+          
+          // Map the data to the expected format
+          const formattedRoles = data.items.map(role => ({
+            id: role.id,
+            name: role.name || '',
+            description: role.description || '',
+            permissions: Array.isArray(role.permissions) ? role.permissions : [],
+            users: typeof role.users === 'number' ? role.users : 
+                  Array.isArray(role.users) ? role.users.length : 0
+          }));
+          
+          // Update state with the fetched data
+          setRoles(formattedRoles);
+          setTotalUsers(data.total || 0);
+          setError(null);
+        }
+      })
+      .catch(err => {
+        console.error('Error searching roles:', err);
+        setError('Failed to search roles');
+        setRoles([]);
+        setTotalUsers(0);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [filters, paginationModel.pageSize, sortModel]);
+
+  // Fetch data when component mounts or when pagination/sorting changes
+  useEffect(() => {
+    // Create a function that doesn't depend on filters
+    const initialFetch = () => {
+      const params = new URLSearchParams({
+        page: paginationModel.page + 1,
+        pageSize: paginationModel.pageSize
+      });
+
+      if (sortModel.length > 0) {
+        params.append('sortField', sortModel[0].field);
+        params.append('sortOrder', sortModel[0].sort);
+      }
+
+      console.log('Initial fetch with params:', params.toString());
+      setLoading(true);
+      
+      fetch(`http://127.0.0.1:8000/api/roles/full?${params.toString()}`)
+        .then(response => {
+          if (!response.ok) {
+            if (response.status === 404) {
+              setRoles([]);
+              setTotalUsers(0);
+              return null;
+            }
+            throw new Error(`Failed to fetch roles: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data) {
+            const formattedRoles = data.items.map(role => ({
+              id: role.id,
+              name: role.name || '',
+              description: role.description || '',
+              permissions: Array.isArray(role.permissions) ? role.permissions : [],
+              users: typeof role.users === 'number' ? role.users : 
+                    Array.isArray(role.users) ? role.users.length : 0
+            }));
+            
+            setRoles(formattedRoles);
+            setTotalUsers(data.total || 0);
+            setError(null);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching roles:', err);
+          setError('Failed to load roles');
+          setRoles([]);
+          setTotalUsers(0);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    };
+
+    initialFetch();
+  }, [paginationModel.page, paginationModel.pageSize, sortModel]);
 
   const handleCreateClick = () => {
     setFormMode('create');
@@ -118,34 +347,90 @@ function RoleIndex() {
     setFormMode(null);
   };
 
-  const handleFormSubmit = (formData) => {
-    switch (formMode) {
-      case 'create':
-        console.log('Creating role:', formData);
-        // Add API call here
-        break;
-      case 'edit':
-        console.log('Updating role:', formData);
-        // Add API call here
-        break;
-      case 'delete':
-        console.log('Deleting role:', selectedRole.id);
-        // Add API call here
-        break;
-      default:
-        break;
+  const handleFormSubmit = async (formData) => {
+    try {
+      let response;
+      
+      // Create a copy of the form data to avoid modifying the original
+      const requestData = {
+        name: formData.name,
+        description: formData.description,
+        permissions: formData.permissions // This is now an array of permission names
+      };
+      
+      console.log('Submitting role with data:', requestData);
+      
+      switch (formMode) {
+        case 'create':
+          response = await fetch('http://127.0.0.1:8000/api/roles/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Error creating role:', errorData);
+            throw new Error(errorData.detail || 'Failed to create role');
+          }
+          
+          console.log('Role created successfully');
+          break;
+          
+        case 'edit':
+          response = await fetch(`http://127.0.0.1:8000/api/roles/${selectedRole.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Error updating role:', errorData);
+            throw new Error(errorData.detail || 'Failed to update role');
+          }
+          
+          console.log('Role updated successfully');
+          break;
+          
+        case 'delete':
+          response = await fetch(`http://127.0.0.1:8000/api/roles/${selectedRole.id}`, {
+            method: 'DELETE'
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Error deleting role:', errorData);
+            throw new Error(errorData.detail || 'Failed to delete role');
+          }
+          
+          console.log('Role deleted successfully');
+          break;
+
+        default:
+          return;
+      }
+
+      // Fetch data again to update the grid
+      fetchData();
+      handleFormClose();
+    } catch (error) {
+      console.error('Operation failed:', error);
+      setError(error.message);
     }
-    handleFormClose();
   };
 
   const columns = [
     { 
       field: 'name', 
       headerName: 'Role Name',
-      description: 'Name of the role', // Added label
+      description: 'Name of the role',
       flex: 1, 
       minWidth: 130,
-      filterable: true,  // Hiding filter
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
@@ -160,10 +445,9 @@ function RoleIndex() {
     { 
       field: 'description', 
       headerName: 'Description',
-      description: 'Role description and purpose', // Added label
+      description: 'Role description and purpose',
       flex: 1.5, 
       minWidth: 200,
-      filterable: true,  // Hiding filter
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
@@ -178,11 +462,10 @@ function RoleIndex() {
     { 
       field: 'users', 
       headerName: 'Users Count',
-      description: 'Number of users with this role', // Added label
+      description: 'Number of users with this role',
+      type: 'number',
       flex: 0.7, 
       minWidth: 110,
-      filterable: true,  // Hiding filter
-      type: 'number',
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
@@ -196,25 +479,26 @@ function RoleIndex() {
     },
     { 
       field: 'permissions', 
-      headerName: 'Permissions Level',
-      description: 'Level of access granted', // Added label
+      headerName: 'Permissions', 
       flex: 1, 
       minWidth: 130,
-      filterable: true,  // Hiding filter
+      renderCell: (params) => {
+        const permissions = params.value || [];
+        // Check if permissions is an array of objects or strings
+        if (permissions.length > 0 && typeof permissions[0] === 'object') {
+          return permissions.map(p => p.name).join(', ');
+        }
+        return permissions.join(', ');
+      },
       renderHeader: (params) => (
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
-            Permissions Level
+            Permissions
           </Typography>
           <Typography variant="caption" color="textSecondary">
-            Level of access
+            Level of access granted
           </Typography>
         </Box>
-      ),
-      renderCell: (params) => (
-        <Typography>
-          {params.row.permissions.length} Permission{params.row.permissions.length !== 1 ? 's' : ''}
-        </Typography>
       )
     },
     {
@@ -251,55 +535,28 @@ function RoleIndex() {
   ];
 
   return (
-    <Box sx={{ height: '100%', width: '100%' }}>
-      <Typography variant="h5" component="h2" gutterBottom>
-        Roles Management
-      </Typography>
-      <Paper sx={{ height: 'calc(100vh - 180px)', width: '100%' }}>
-        <DataGrid
-          rows={mockRoles}
-          columns={columns}
-          pageSizeOptions={[5, 10, 20]}
-          initialState={{
-            pagination: {
-              paginationModel: { pageSize: 10, page: 0 },
-            },
-          }}
-          onPaginationModelChange={(newModel) => {
-            setPageSize(newModel.pageSize);
-          }}
-          slots={{
-            toolbar: (props) => <CustomToolbar {...props} onCreateClick={handleCreateClick} />,
-          }}
-          slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { 
-                debounceMs: 500,
-                variant: "outlined"
-              },
-            },
-          }}
-          filterMode="client"
-          disableColumnFilter={false}
-          disableDensitySelector
-          disableColumnSelector
-          autoHeight
-          getRowHeight={() => 'auto'}
-          sx={{
-            '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'primary.main',
-              color: 'primary.contrastText',
-            },
-            '& .MuiDataGrid-cell:hover': {
-              color: 'primary.main',
-            },
-            '& .MuiDataGrid-row': {
-              minHeight: '48px !important'
-            }
-          }}
-        />
-      </Paper>
+    <>
+      <GenericDataGrid
+        title="Roles Management"
+        rows={roles}
+        columns={columns}
+        loading={loading}
+        totalRows={totalUsers}
+        createButtonText="Role"
+        onCreateClick={handleCreateClick}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
+        showQuickFilter={false}
+        CustomFilterComponent={RoleFilters}
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        onSearch={handleSearch}
+        paginationMode="server"
+        sortingMode="server"
+        filterMode="server"
+      />
 
       <RoleForm
         open={isFormOpen}
@@ -308,7 +565,7 @@ function RoleIndex() {
         onSubmit={handleFormSubmit}
         mode={formMode}
       />
-    </Box>
+    </>
   );
 }
 

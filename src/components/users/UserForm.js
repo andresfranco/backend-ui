@@ -57,7 +57,8 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
         throw new Error('Failed to fetch roles');
       }
       const data = await response.json();
-      setAvailableRoles(data);
+      // Handle paginated response format
+      setAvailableRoles(data.items || []);
     } catch (error) {
       console.error('Error fetching roles:', error);
       setApiError('Failed to load roles');

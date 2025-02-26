@@ -13,34 +13,51 @@ import {
   MenuItem,
   Typography,
   Chip,
-  Stack
+  Stack,
+  Alert
 } from '@mui/material';
-
-// Mock permissions data - replace with API call
-const availablePermissions = [
-  'CREATE_USER',
-  'EDIT_USER',
-  'DELETE_USER',
-  'VIEW_USER',
-  'CREATE_ROLE',
-  'EDIT_ROLE',
-  'DELETE_ROLE',
-  'VIEW_ROLE'
-];
 
 function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    permissions: [],
+    permissions: []
   });
+  const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState('');
+  const [availablePermissions, setAvailablePermissions] = useState([]);
+
+  // Fetch available permissions
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/permissions/full');
+        if (!response.ok) {
+          throw new Error('Failed to fetch permissions');
+        }
+        const data = await response.json();
+        setAvailablePermissions(data.items || []);
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+        setApiError('Failed to load permissions');
+      }
+    };
+
+    fetchPermissions();
+  }, []);
   
+  // Reset form when role changes
   useEffect(() => {
     if (role) {
       setFormData({
         name: role.name || '',
         description: role.description || '',
-        permissions: Array.isArray(role.permissions) ? role.permissions : []
+        // Extract permission names from the permissions array
+        permissions: Array.isArray(role.permissions) 
+          ? role.permissions.map(permission => 
+              typeof permission === 'object' ? permission.name : permission
+            ) 
+          : []
       });
     } else {
       setFormData({
@@ -50,8 +67,6 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
       });
     }
   }, [role]);
-
-  const [errors, setErrors] = useState({});
 
   const validateForm = () => {
     const newErrors = {};
@@ -70,9 +85,20 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setApiError('');
     if (validateForm()) {
-      onSubmit(formData);
-      onClose();
+      // Log the form data being submitted
+      console.log('Submitting role with permissions:', formData.permissions);
+      
+      // Create a copy of the form data to ensure we're not modifying the original
+      const submissionData = {
+        ...formData,
+        // Ensure permissions is an array of strings
+        permissions: Array.isArray(formData.permissions) ? formData.permissions : []
+      };
+      
+      console.log('Final submission data:', submissionData);
+      onSubmit(submissionData);
     }
   };
 
@@ -91,13 +117,12 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   };
 
   const handlePermissionChange = (event) => {
-    const {
-      target: { value },
-    } = event;
+    const selectedPermissions = event.target.value;
     setFormData(prev => ({
       ...prev,
-      permissions: typeof value === 'string' ? value.split(',') : value,
+      permissions: selectedPermissions
     }));
+
     if (errors.permissions) {
       setErrors(prev => ({
         ...prev,
@@ -118,6 +143,11 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent>
+          {apiError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {apiError}
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               fullWidth
@@ -152,15 +182,22 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
                 disabled={mode === 'delete'}
                 renderValue={(selected) => (
                   <Stack direction="row" spacing={0.5} flexWrap="wrap" gap={0.5}>
-                    {selected.map((value) => (
-                      <Chip key={value} label={value} size="small" />
+                    {selected.map((permissionName) => (
+                      <Chip 
+                        key={permissionName} 
+                        label={permissionName} 
+                        size="small" 
+                      />
                     ))}
                   </Stack>
                 )}
               >
                 {availablePermissions.map((permission) => (
-                  <MenuItem key={permission} value={permission}>
-                    {permission}
+                  <MenuItem key={permission.id} value={permission.name}>
+                    <Typography variant="body2">{permission.name}</Typography>
+                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                      {permission.description}
+                    </Typography>
                   </MenuItem>
                 ))}
               </Select>
