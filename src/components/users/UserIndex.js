@@ -1,18 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Box,
-  IconButton,
-  Tooltip,
-  Chip,
-  Typography,
-} from '@mui/material';
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import { Box,IconButton,Tooltip,Chip,Typography} from '@mui/material';
+import {Edit as EditIcon,Delete as DeleteIcon} from '@mui/icons-material';
 import UserForm from './UserForm';
 import GenericDataGrid from '../common/GenericDataGrid';
 import UserFilters from './UserFilters';
+import SERVER_URL from '../common/BackendServerData'; 
 
 function UserIndex() {
   const [filters, setFilters] = useState({
@@ -63,7 +55,7 @@ function UserIndex() {
     setLoading(true);
     
     // Use the /full endpoint like the permissions component
-    return fetch(`http://127.0.0.1:8000/api/users/full?${params}`)
+    return fetch(`${SERVER_URL}/api/users/full?${params}`)
       .then(response => {
         console.log('Response status:', response.status);
         if (!response.ok) {
@@ -163,7 +155,7 @@ function UserIndex() {
       let response;
       switch (formMode) {
         case 'create':
-          response = await fetch('http://127.0.0.1:8000/api/users/', {
+          response = await fetch(`${SERVER_URL}/api/users/`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -178,7 +170,7 @@ function UserIndex() {
           break;
           
         case 'edit':
-          response = await fetch(`http://127.0.0.1:8000/api/users/${selectedUser.id}`, {
+          response = await fetch(`${SERVER_URL}/api/users/${selectedUser.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -193,7 +185,7 @@ function UserIndex() {
           break;
           
         case 'delete':
-          response = await fetch(`http://127.0.0.1:8000/api/users/${selectedUser.id}`, {
+          response = await fetch(`${SERVER_URL}/api/users/${selectedUser.id}`, {
             method: 'DELETE'
           });
           break;

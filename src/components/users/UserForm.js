@@ -1,21 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Typography,
-  Chip,
-  Stack,
-  Alert
-} from '@mui/material';
+import {Dialog,DialogTitle,DialogContent,DialogActions,TextField,Button,Box,FormControl,InputLabel,Select,MenuItem,Typography,Chip,Stack,Alert} from '@mui/material';
+import SERVER_URL from '../common/BackendServerData';
 
 function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
   const [formData, setFormData] = useState({
@@ -52,7 +37,7 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
 
   const fetchRoles = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/roles/');
+      const response = await fetch(`${SERVER_URL}/api/roles/`);
       if (!response.ok) {
         throw new Error('Failed to fetch roles');
       }

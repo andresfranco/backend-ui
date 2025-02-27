@@ -1,26 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box,
-  Paper,
-  Typography,
-  IconButton,
-  TextField,
-  Stack,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Button,
-  Tooltip,
-  Chip,
-  OutlinedInput,
-} from '@mui/material';
-import {
-  Search as SearchIcon,
-  AddCircleOutline as AddFilterIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
-
+import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,Button,Tooltip,Chip,OutlinedInput} from '@mui/material';
+import {Search as SearchIcon,AddCircleOutline as AddFilterIcon,Close as CloseIcon} from '@mui/icons-material';
+import SERVER_URL from '../common/BackendServerData';
 // Filter type definitions
 const FILTER_TYPES = {
   name: {
@@ -80,7 +61,7 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/permissions/full');
+        const response = await fetch(`${SERVER_URL}/api/permissions/full`);
         if (response.ok) {
           const data = await response.json();
           setAvailablePermissions(data.items || []);

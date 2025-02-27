@@ -1,25 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  Box,
-  IconButton,
-  Tooltip,
-  Typography,
-  Alert,
-} from '@mui/material';
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import { Box,IconButton,Tooltip,Typography,Alert} from '@mui/material';
+import {Edit as EditIcon,Delete as DeleteIcon} from '@mui/icons-material';
 import PermissionForm from './PermissionForm';
 import GenericDataGrid from '../common/GenericDataGrid';
 import PermissionFilters from './PermissionFilters';
+import SERVER_URL from '../common/BackendServerData';
 
 function PermissionIndex() {
   const [filters, setFilters] = useState({
     name: '',
     description: ''
   });
-
+ 
   const [permissions, setPermissions] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,7 +62,7 @@ function PermissionIndex() {
     setLoading(true);
     
     // Make the API request with the formatted URL
-    const apiUrl = `http://127.0.0.1:8000/api/permissions/full?${params.toString()}`;
+    const apiUrl = SERVER_URL + `/api/permissions/full?${params.toString()}`;
     console.log('API URL:', apiUrl);
     
     fetch(apiUrl)
@@ -145,7 +137,7 @@ function PermissionIndex() {
       console.log('Fetching all permissions with params:', params.toString());
       setLoading(true);
       
-      fetch(`http://127.0.0.1:8000/api/permissions/full?${params.toString()}`)
+      fetch(`${SERVER_URL}/api/permissions/full?${params.toString()}`)
         .then(response => {
           if (!response.ok) {
             if (response.status === 404) {
@@ -222,7 +214,7 @@ function PermissionIndex() {
     console.log('Searching permissions with params:', params.toString());
     setLoading(true);
     
-    const apiUrl = `http://127.0.0.1:8000/api/permissions/full?${params.toString()}`;
+    const apiUrl = `${SERVER_URL}/api/permissions/full?${params.toString()}`;
     console.log('Search API URL:', apiUrl);
     
     fetch(apiUrl)
@@ -283,7 +275,7 @@ function PermissionIndex() {
       console.log('Initial fetch with params:', params.toString());
       setLoading(true);
       
-      fetch(`http://127.0.0.1:8000/api/permissions/full?${params.toString()}`)
+      fetch(`${SERVER_URL}/api/permissions/full?${params.toString()}`)
         .then(response => {
           if (!response.ok) {
             if (response.status === 404) {
@@ -351,7 +343,7 @@ function PermissionIndex() {
       let response;
       switch (formMode) {
         case 'create':
-          response = await fetch('http://127.0.0.1:8000/api/permissions/', {
+          response = await fetch(`${SERVER_URL}/api/permissions/`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -361,7 +353,7 @@ function PermissionIndex() {
           break;
           
         case 'edit':
-          response = await fetch(`http://127.0.0.1:8000/api/permissions/${selectedPermission.id}/`, {
+          response = await fetch(`${SERVER_URL}/api/permissions/${selectedPermission.id}/`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -371,7 +363,7 @@ function PermissionIndex() {
           break;
           
         case 'delete':
-          response = await fetch(`http://127.0.0.1:8000/api/permissions/${selectedPermission.id}/`, {
+          response = await fetch(`${SERVER_URL}/api/permissions/${selectedPermission.id}/`, {
             method: 'DELETE'
           });
           break;

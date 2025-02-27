@@ -1,27 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box,
-  Paper,
-  Typography,
-  IconButton,
-  TextField,
-  Stack,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  ToggleButton,
-  ToggleButtonGroup,
-  Button,
-  Tooltip,
-  Chip,
-} from '@mui/material';
-import {
-  Search as SearchIcon,
-  AddCircleOutline as AddFilterIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
-
+import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,ToggleButton,ToggleButtonGroup,Button,Tooltip,Chip} from '@mui/material';
+import {Search as SearchIcon,AddCircleOutline as AddFilterIcon,Close as CloseIcon} from '@mui/icons-material';
+import SERVER_URL from '../common/BackendServerData';
 // Filter type definitions
 const FILTER_TYPES = {
   username: {
@@ -46,7 +26,7 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
 
   // Fetch available roles
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/roles/')
+    fetch(`${SERVER_URL}/api/roles/`)
       .then(response => response.json())
       .then(data => {
         setAvailableRoles(data);

@@ -1,23 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box,
-  Paper,
-  Typography,
-  IconButton,
-  TextField,
-  Stack,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Button,
-  Tooltip,
-} from '@mui/material';
-import {
-  Search as SearchIcon,
-  AddCircleOutline as AddFilterIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,Button,Tooltip} from '@mui/material';
+import {Search as SearchIcon,AddCircleOutline as AddFilterIcon,Close as CloseIcon} from '@mui/icons-material';
 
 // Filter type definitions with more specific handling
 const FILTER_TYPES = {

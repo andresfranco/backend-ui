@@ -1,22 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Typography,
-  Chip,
-  Stack,
-  Alert
-} from '@mui/material';
-
+import {Dialog,DialogTitle,DialogContent,DialogActions,TextField,Button,Box,FormControl,InputLabel,Select,MenuItem,Typography,Chip,Stack,Alert} from '@mui/material';
+import SERVER_URL from '../common/BackendServerData';
 function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -31,7 +15,7 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/permissions/full');
+        const response = await fetch(`${SERVER_URL}/api/permissions/full`);
         if (!response.ok) {
           throw new Error('Failed to fetch permissions');
         }

@@ -1,17 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  Box,
-  Typography,
-  IconButton,
-  Tooltip,
-} from '@mui/material';
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import { Box,Typography,IconButton,Tooltip} from '@mui/material';
+import {Edit as EditIcon,Delete as DeleteIcon,} from '@mui/icons-material';
 import RoleForm from './RoleForm';
 import GenericDataGrid from '../common/GenericDataGrid';
 import RoleFilters from './RoleFilters';
+import SERVER_URL from '../common/BackendServerData';
 
 function RoleIndex() {
   const [filters, setFilters] = useState({
@@ -65,7 +58,7 @@ function RoleIndex() {
     console.log('Fetching roles with params:', params.toString());
     setLoading(true);
     
-    const apiUrl = `http://127.0.0.1:8000/api/roles/full?${params.toString()}`;
+    const apiUrl = `${SERVER_URL}/api/roles/full?${params.toString()}`;
     console.log('Fetch API URL:', apiUrl);
     
     fetch(apiUrl)
@@ -129,7 +122,7 @@ function RoleIndex() {
       console.log('Fetching all roles with params:', params.toString());
       setLoading(true);
       
-      fetch(`http://127.0.0.1:8000/api/roles/full?${params.toString()}`)
+      fetch(`${SERVER_URL}/api/roles/full?${params.toString()}`)
         .then(response => {
           if (!response.ok) {
             if (response.status === 404) {
@@ -211,7 +204,7 @@ function RoleIndex() {
     console.log('Searching roles with params:', params.toString());
     setLoading(true);
     
-    const apiUrl = `http://127.0.0.1:8000/api/roles/full?${params.toString()}`;
+    const apiUrl = `${SERVER_URL}/api/roles/full?${params.toString()}`;
     console.log('Search API URL:', apiUrl);
     
     fetch(apiUrl)
@@ -262,7 +255,7 @@ function RoleIndex() {
       console.log('Initial fetch with params:', params.toString());
       setLoading(true);
       
-      fetch(`http://127.0.0.1:8000/api/roles/full?${params.toString()}`)
+      fetch(`${SERVER_URL}/api/roles/full?${params.toString()}`)
         .then(response => {
           if (!response.ok) {
             if (response.status === 404) {
@@ -343,7 +336,7 @@ function RoleIndex() {
       
       switch (formMode) {
         case 'create':
-          response = await fetch('http://127.0.0.1:8000/api/roles/', {
+          response = await fetch(`${SERVER_URL}/api/roles/`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -361,7 +354,7 @@ function RoleIndex() {
           break;
           
         case 'edit':
-          response = await fetch(`http://127.0.0.1:8000/api/roles/${selectedRole.id}`, {
+          response = await fetch(`${SERVER_URL}/api/roles/${selectedRole.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -379,7 +372,7 @@ function RoleIndex() {
           break;
           
         case 'delete':
-          response = await fetch(`http://127.0.0.1:8000/api/roles/${selectedRole.id}`, {
+          response = await fetch(`${SERVER_URL}/api/roles/${selectedRole.id}`, {
             method: 'DELETE'
           });
           
