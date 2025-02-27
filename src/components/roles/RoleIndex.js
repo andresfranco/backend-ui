@@ -17,7 +17,7 @@ function RoleIndex() {
   const [filters, setFilters] = useState({
     name: '',
     description: '',
-    permission: ''
+    permission: []
   });
 
   const [roles, setRoles] = useState([]);
@@ -41,20 +41,22 @@ function RoleIndex() {
 
     // Add non-empty filters to params
     Object.entries(searchFilters).forEach(([key, value]) => {
-      if (value && value.toString().trim()) {
-        if (key === 'permission') {
-          // Handle permission filter differently
-          params.append('filterField', 'permissions');
-          params.append('filterValue', value.toString().trim());
-          params.append('filterOperator', 'contains');
-        } else {
-          params.append('filterField', key);
-          params.append('filterValue', value.toString().trim());
-          params.append('filterOperator', 'contains');
-        }
+      if (key === 'permission' && Array.isArray(value) && value.length > 0) {
+        // Handle multiple permissions
+        value.forEach(permission => {
+          params.append('filterField', 'permission');
+          params.append('filterValue', permission);
+          params.append('filterOperator', 'equals');
+        });
+      } else if (value && (!Array.isArray(value) && value.toString().trim())) {
+        // Handle other filters
+        params.append('filterField', key);
+        params.append('filterValue', value.toString().trim());
+        params.append('filterOperator', 'contains');
       }
     });
 
+    // Add sorting if available
     if (sortModel.length > 0) {
       params.append('sortField', sortModel[0].field);
       params.append('sortOrder', sortModel[0].sort);
@@ -63,35 +65,26 @@ function RoleIndex() {
     console.log('Fetching roles with params:', params.toString());
     setLoading(true);
     
-    // Use the /full endpoint like the permissions component
-    return fetch(`http://127.0.0.1:8000/api/roles/full?${params}`)
+    const apiUrl = `http://127.0.0.1:8000/api/roles/full?${params.toString()}`;
+    console.log('Fetch API URL:', apiUrl);
+    
+    fetch(apiUrl)
       .then(response => {
-        console.log('Response status:', response.status);
         if (!response.ok) {
           if (response.status === 404) {
             setRoles([]);
             setTotalUsers(0);
             return null;
           }
-          throw new Error(`Failed to fetch roles: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
       })
       .then(data => {
         if (data) {
-          console.log('Received roles data:', data);
-          setRoles(data.items.map(role => ({
-            id: role.id,
-            name: role.name || '',
-            description: role.description || '',
-            // Ensure permissions is always an array, even if it's null or undefined
-            permissions: Array.isArray(role.permissions) ? role.permissions : [],
-            // Ensure users is always an integer
-            users: typeof role.users === 'number' ? role.users : 
-                  Array.isArray(role.users) ? role.users.length : 0
-          })));
+          console.log('Roles data received:', data);
+          setRoles(data.items || []);
           setTotalUsers(data.total || 0);
-          setError(null);
         }
       })
       .catch(err => {
@@ -200,24 +193,25 @@ function RoleIndex() {
 
     // Add non-empty filters to params
     Object.entries(filters).forEach(([key, value]) => {
-      if (value && value.toString().trim()) {
-        if (key === 'permission') {
-          // Handle permission filter differently
-          params.append('filterField', 'permissions');
-          params.append('filterValue', value.toString().trim());
-          params.append('filterOperator', 'contains');
-        } else {
-          params.append('filterField', key);
-          params.append('filterValue', value.toString().trim());
-          params.append('filterOperator', 'contains');
-        }
+      if (key === 'permission' && Array.isArray(value) && value.length > 0) {
+        // Handle multiple permissions
+        value.forEach(permission => {
+          params.append('filterField', 'permission');
+          params.append('filterValue', permission);
+          params.append('filterOperator', 'equals');
+        });
+      } else if (value && (!Array.isArray(value) && value.toString().trim())) {
+        // Handle other filters
+        params.append('filterField', key);
+        params.append('filterValue', value.toString().trim());
+        params.append('filterOperator', 'contains');
       }
     });
 
     console.log('Searching roles with params:', params.toString());
     setLoading(true);
     
-    const apiUrl = `http://127.0.0.1:8000/api/roles/full?${params}`;
+    const apiUrl = `http://127.0.0.1:8000/api/roles/full?${params.toString()}`;
     console.log('Search API URL:', apiUrl);
     
     fetch(apiUrl)
@@ -229,33 +223,20 @@ function RoleIndex() {
             setTotalUsers(0);
             return null;
           }
-          throw new Error(`Failed to fetch roles: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
       })
       .then(data => {
         if (data) {
-          console.log('Received search results:', data);
-          
-          // Map the data to the expected format
-          const formattedRoles = data.items.map(role => ({
-            id: role.id,
-            name: role.name || '',
-            description: role.description || '',
-            permissions: Array.isArray(role.permissions) ? role.permissions : [],
-            users: typeof role.users === 'number' ? role.users : 
-                  Array.isArray(role.users) ? role.users.length : 0
-          }));
-          
-          // Update state with the fetched data
-          setRoles(formattedRoles);
+          console.log('Roles data received:', data);
+          setRoles(data.items || []);
           setTotalUsers(data.total || 0);
-          setError(null);
         }
       })
       .catch(err => {
-        console.error('Error searching roles:', err);
-        setError('Failed to search roles');
+        console.error('Error fetching roles:', err);
+        setError('Failed to load roles');
         setRoles([]);
         setTotalUsers(0);
       })

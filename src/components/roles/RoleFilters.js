@@ -12,6 +12,8 @@ import {
   InputLabel,
   Button,
   Tooltip,
+  Chip,
+  OutlinedInput,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -33,7 +35,7 @@ const FILTER_TYPES = {
   },
   permission: {
     label: 'Permission',
-    type: 'select',
+    type: 'multiselect',
     placeholder: 'Filter by permission'
   }
 };
@@ -64,6 +66,15 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
     return activeFilters.length + 1;
   });
   const [availablePermissions, setAvailablePermissions] = useState([]);
+  // Initialize tempFilters with the current filters
+  const [tempFilters, setTempFilters] = useState(() => {
+    const initialFilters = { ...filters };
+    // Ensure permission is always an array
+    if (!Array.isArray(initialFilters.permission)) {
+      initialFilters.permission = initialFilters.permission ? [initialFilters.permission] : [];
+    }
+    return initialFilters;
+  });
 
   // Fetch permissions for the dropdown
   useEffect(() => {
@@ -83,6 +94,16 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
 
     fetchPermissions();
   }, []);
+
+  // Update tempFilters when filters prop changes
+  useEffect(() => {
+    const updatedFilters = { ...filters };
+    // Ensure permission is always an array
+    if (!Array.isArray(updatedFilters.permission)) {
+      updatedFilters.permission = updatedFilters.permission ? [updatedFilters.permission] : [];
+    }
+    setTempFilters(updatedFilters);
+  }, [filters]);
 
   // Update activeFilters when filters prop changes
   useEffect(() => {
@@ -125,34 +146,30 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
     // Clear the removed filter's value
     const removedFilter = activeFilters.find(f => f.id === filterId);
     if (removedFilter) {
-      const updatedFilterValues = { ...filters };
+      const updatedFilterValues = { ...tempFilters };
       delete updatedFilterValues[removedFilter.type];
-      onFiltersChange(updatedFilterValues);
+      setTempFilters(updatedFilterValues);
     }
   };
 
   const handleFilterChange = (filterId, value) => {
     const filter = activeFilters.find(f => f.id === filterId);
     if (filter) {
-      // Create a new filters object with the updated value
       const updatedFilters = {
         ...filters,
         [filter.type]: value
       };
       
-      console.log('Filter changed:', filter.type, value);
+      // Immediately update parent filters
       onFiltersChange(updatedFilters);
       
-      // Only auto-refresh if ALL filters are empty
+      // If all filters are empty, trigger search
       const hasActiveFilters = Object.values(updatedFilters).some(value => 
-        value && value.toString().trim() !== ''
+        value && (Array.isArray(value) ? value.length > 0 : value.toString().trim() !== '')
       );
       
-      if (!hasActiveFilters) {
-        console.log('All filters are empty, auto-refreshing grid');
-        if (onSearch) {
-          onSearch();
-        }
+      if (!hasActiveFilters && onSearch) {
+        onSearch();
       }
     }
   };
@@ -169,23 +186,39 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
     
     // Clear the old filter value
     if (oldType) {
-      const updatedFilterValues = { ...filters };
+      const updatedFilterValues = { ...tempFilters };
       delete updatedFilterValues[oldType];
-      onFiltersChange(updatedFilterValues);
+      setTempFilters(updatedFilterValues);
+    }
+  };
+
+  const handleSearch = () => {
+    console.log('Search button clicked with filters:', tempFilters);
+    onFiltersChange(tempFilters);
+    if (onSearch) {
+      onSearch();
     }
   };
 
   const renderFilterInput = (filter) => {
     const filterType = FILTER_TYPES[filter.type];
     
-    if (filterType.type === 'select' && filter.type === 'permission') {
+    if (filterType.type === 'multiselect' && filter.type === 'permission') {
       return (
         <FormControl sx={{ flex: 1 }}>
-          <InputLabel>Select Permission</InputLabel>
+          <InputLabel>Select Permissions</InputLabel>
           <Select
-            value={filters[filter.type] || ''}
+            multiple
+            value={tempFilters[filter.type] || []}
             onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-            label="Select Permission"
+            input={<OutlinedInput label="Select Permissions" />}
+            renderValue={(selected) => (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selected.map((value) => (
+                  <Chip key={value} label={value} />
+                ))}
+              </Box>
+            )}
             size="small"
           >
             <MenuItem value="">
@@ -207,7 +240,7 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
         label={filterType.label}
         placeholder={filterType.placeholder}
         size="small"
-        value={filters[filter.type] || ''}
+        value={tempFilters[filter.type] || ''}
         onChange={(e) => handleFilterChange(filter.id, e.target.value)}
         sx={{ flex: 1 }}
       />
@@ -269,12 +302,7 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
             variant="contained"
             color="primary"
             startIcon={<SearchIcon />}
-            onClick={() => {
-              console.log('Search button clicked with filters:', filters);
-              if (onSearch) {
-                onSearch();
-              }
-            }}
+            onClick={handleSearch}
             sx={{ minWidth: 120 }}
           >
             Search
