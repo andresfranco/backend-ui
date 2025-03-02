@@ -121,8 +121,8 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
   };
 
   const handleRemoveFilter = (filterId) => {
-    const updatedFilters = activeFilters.filter(f => f.id !== filterId);
-    setActiveFilters(updatedFilters);
+    const updatedActiveFilters = activeFilters.filter(f => f.id !== filterId);
+    setActiveFilters(updatedActiveFilters);
     
     // Clear the removed filter's value
     const removedFilter = activeFilters.find(f => f.id === filterId);
@@ -130,6 +130,8 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
       const updatedFilterValues = { ...tempFilters };
       delete updatedFilterValues[removedFilter.type];
       setTempFilters(updatedFilterValues);
+      // Propagate the updated filters to the parent immediately
+      onFiltersChange(updatedFilterValues);
     }
   };
 
