@@ -163,8 +163,10 @@ function RoleIndex() {
   };
 
   // Handle search button click
-  const handleSearch = useCallback(() => {
-    console.log('Search clicked with filters:', filters);
+  const handleSearch = useCallback((searchFilters) => {
+    // Default to state filters if no parameter is provided
+    const effectiveFilters = searchFilters || filters;
+    console.log('Search clicked with filters:', effectiveFilters);
     
     // Reset to first page when searching
     setPaginationModel(prevModel => ({
@@ -172,35 +174,32 @@ function RoleIndex() {
       page: 0
     }));
     
-    // Build query parameters with current filters
+    // Build query parameters with the effective filters
     const params = new URLSearchParams({
       page: 1, // Reset to first page
       pageSize: paginationModel.pageSize
     });
-
+  
     // Add sorting if available
     if (sortModel.length > 0) {
       params.append('sortField', sortModel[0].field);
       params.append('sortOrder', sortModel[0].sort);
     }
-
-    // Add non-empty filters to params
-    Object.entries(filters).forEach(([key, value]) => {
+  
+    Object.entries(effectiveFilters).forEach(([key, value]) => {
       if (key === 'permission' && Array.isArray(value) && value.length > 0) {
-        // Handle multiple permissions
         value.forEach(permission => {
           params.append('filterField', 'permission');
           params.append('filterValue', permission);
           params.append('filterOperator', 'equals');
         });
       } else if (value && (!Array.isArray(value) && value.toString().trim())) {
-        // Handle other filters
         params.append('filterField', key);
         params.append('filterValue', value.toString().trim());
         params.append('filterOperator', 'contains');
       }
     });
-
+  
     console.log('Searching roles with params:', params.toString());
     setLoading(true);
     
@@ -237,6 +236,7 @@ function RoleIndex() {
         setLoading(false);
       });
   }, [filters, paginationModel.pageSize, sortModel]);
+  
 
   // Fetch data when component mounts or when pagination/sorting changes
   useEffect(() => {

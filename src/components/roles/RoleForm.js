@@ -32,25 +32,34 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   
   // Reset form when role changes
   useEffect(() => {
-    if (role) {
+    if (mode === 'create') {
+      // In create mode, start with an empty form
+      setFormData({
+        name: '',
+        description: '',
+        permissions: []
+      });
+    } else if (role) {
+      // For edit or other modes, load role data if available
       setFormData({
         name: role.name || '',
         description: role.description || '',
-        // Extract permission names from the permissions array
-        permissions: Array.isArray(role.permissions) 
-          ? role.permissions.map(permission => 
+        permissions: Array.isArray(role.permissions)
+          ? role.permissions.map(permission =>
               typeof permission === 'object' ? permission.name : permission
-            ) 
+            )
           : []
       });
     } else {
+      // If no role is provided, ensure the form is cleared
       setFormData({
         name: '',
         description: '',
         permissions: []
       });
     }
-  }, [role]);
+  }, [role, mode]);
+  
 
   const validateForm = () => {
     const newErrors = {};

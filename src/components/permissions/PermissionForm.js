@@ -11,18 +11,22 @@ function PermissionForm({ open, onClose, permission, onSubmit, mode = 'create' }
   
   // Reset form when permission changes
   useEffect(() => {
-    if (permission) {
-      setFormData({
-        name: permission.name || '',
-        description: permission.description || ''
-      });
-    } else {
+    if (mode === 'create') {
+      // For create mode, clear the form
       setFormData({
         name: '',
         description: ''
       });
+    } else {
+      // For other modes (e.g., edit or delete), load the permission data
+      setFormData({
+        name: permission?.name || '',
+        description: permission?.description || ''
+      });
     }
-  }, [permission]);
+  }, [permission, mode]);
+  
+  
 
   const validateForm = () => {
     const newErrors = {};

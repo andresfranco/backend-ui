@@ -141,17 +141,8 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
         [filter.type]: value
       };
       
-      // Immediately update parent filters
+      console.log('Filter changed:', filter.type, value);
       onFiltersChange(updatedFilters);
-      
-      // If all filters are empty, trigger search
-      const hasActiveFilters = Object.values(updatedFilters).some(value => 
-        value && (Array.isArray(value) ? value.length > 0 : value.toString().trim() !== '')
-      );
-      
-      if (!hasActiveFilters && onSearch) {
-        onSearch();
-      }
     }
   };
 
@@ -177,7 +168,7 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
     console.log('Search button clicked with filters:', tempFilters);
     onFiltersChange(tempFilters);
     if (onSearch) {
-      onSearch();
+      onSearch(tempFilters);
     }
   };
 
@@ -279,15 +270,21 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
           ))}
         </Stack>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<SearchIcon />}
-            onClick={handleSearch}
-            sx={{ minWidth: 120 }}
-          >
-            Search
-          </Button>
+        <Button
+        variant="contained"
+        color="primary"
+        startIcon={<SearchIcon />}
+        onClick={() => {
+          console.log('Search button clicked with filters:', tempFilters);
+          onFiltersChange(tempFilters);
+          if (onSearch) {
+            onSearch(tempFilters);
+          }
+        }}
+        sx={{ minWidth: 120 }}
+       >
+        Search
+      </Button>
         </Box>
       </Stack>
     </Paper>
