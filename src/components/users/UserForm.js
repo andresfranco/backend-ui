@@ -12,6 +12,7 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
   const [errors, setErrors] = useState({});
   const [availableRoles, setAvailableRoles] = useState([]);
   const [apiError, setApiError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -30,6 +31,29 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
 
     fetchRoles();
   }, []);
+
+  // Initialize form data when user prop changes or mode changes
+  useEffect(() => {
+    if (mode === 'edit' || mode === 'delete') {
+      if (user) {
+        setFormData({
+          id: user.id,
+          username: user.username || '',
+          email: user.email || '',
+          password: '', // Password is empty when editing
+          roles: user.roles || []
+        });
+      }
+    } else {
+      // Reset form for create mode
+      setFormData({
+        username: '',
+        email: '',
+        password: '',
+        roles: []
+      });
+    }
+  }, [user, mode]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -51,11 +75,64 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError('');
-    if (validateForm()) {
-      onSubmit(formData);
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      let url = `${SERVER_URL}/api/users`;
+      let method = 'POST';
+      
+      // Create a copy of formData to modify for the API request
+      let body = { ...formData };
+      
+      // Extract role IDs for the API request
+      body.roles = formData.roles.map(role => role.id);
+      
+      // For edit and delete, use the user ID in the URL
+      if (mode === 'edit' || mode === 'delete') {
+        url = `${SERVER_URL}/api/users/${formData.id}`;
+        method = mode === 'edit' ? 'PUT' : 'DELETE';
+      }
+      
+      // For edit mode, only include password if it's not empty
+      if (mode === 'edit' && !formData.password) {
+        delete body.password;
+      }
+      
+      console.log('Sending request:', { url, method, body });
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: method !== 'DELETE' ? JSON.stringify(body) : undefined
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to ${mode} user: ${response.status}`);
+      }
+      
+      // Call onSubmit to notify parent component
+      if (onSubmit) {
+        onSubmit(true);
+      }
+      
+      // Close the form
+      onClose(true);
+    } catch (error) {
+      console.error(`Error ${mode}ing user:`, error);
+      setApiError(error.message || `Failed to ${mode} user`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -92,10 +169,15 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
     }
   };
 
+  const handleCancel = (e) => {
+    e.preventDefault();
+    onClose(false);
+  };
+
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={() => onClose(false)}
       maxWidth="sm"
       fullWidth
     >
@@ -131,33 +213,40 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
               helperText={errors.email}
               disabled={mode === 'delete'}
             />
-            {(mode === 'create' || mode === 'edit') && (
+            {(mode === 'create' || (mode === 'edit' && formData.password)) && (
               <TextField
                 fullWidth
-                label={mode === 'create' ? "Password" : "New Password (leave blank to keep current)"}
+                label="Password"
                 name="password"
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
                 error={!!errors.password}
                 helperText={errors.password}
-                required={mode === 'create'}
+                disabled={mode === 'delete'}
               />
             )}
-            <FormControl fullWidth error={!!errors.roles}>
-              <InputLabel>Roles</InputLabel>
+            <FormControl fullWidth error={!!errors.roles} disabled={mode === 'delete'}>
+              <InputLabel id="roles-select-label">Roles</InputLabel>
               <Select
+                labelId="roles-select-label"
+                id="roles-select"
                 multiple
-                name="roles"
                 value={formData.roles.map(role => role.id)}
                 onChange={handleRoleChange}
-                label="Roles"
-                disabled={mode === 'delete'}
                 renderValue={(selected) => (
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap" gap={0.5}>
-                    {formData.roles.map((role) => (
-                      <Chip key={role.id} label={role.name} size="small" />
-                    ))}
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                    {selected.map((roleId) => {
+                      const role = availableRoles.find(r => r.id === roleId);
+                      return role ? (
+                        <Chip 
+                          key={role.id} 
+                          label={role.name} 
+                          size="small" 
+                          sx={{ m: 0.5 }}
+                        />
+                      ) : null;
+                    })}
                   </Stack>
                 )}
               >
@@ -173,33 +262,19 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
                 </Typography>
               )}
             </FormControl>
-            {mode === 'delete' && (
-              <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-                Are you sure you want to delete this user? This action cannot be undone.
-              </Typography>
-            )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button 
-            onClick={onClose}
-            variant="contained"
-            sx={{ 
-              bgcolor: 'grey.300',
-              color: 'grey.800',
-              '&:hover': {
-                bgcolor: 'grey.400'
-              }
-            }}
-          >
+        <DialogActions>
+          <Button onClick={handleCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            variant="contained"
+          <Button 
+            type="submit" 
+            variant="contained" 
             color={mode === 'delete' ? 'error' : 'primary'}
+            disabled={isSubmitting}
           >
-            {mode === 'create' ? 'Create' : mode === 'edit' ? 'Save' : 'Delete'}
+            {isSubmitting ? 'Processing...' : mode === 'create' ? 'Create' : mode === 'edit' ? 'Update' : 'Delete'}
           </Button>
         </DialogActions>
       </form>

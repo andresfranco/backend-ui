@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Box,IconButton,Tooltip,Typography,Alert} from '@mui/material';
-import {Edit as EditIcon,Delete as DeleteIcon} from '@mui/icons-material';
+import React, { useState } from 'react';
+import { Box, IconButton, Tooltip } from '@mui/material';
+import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import PermissionForm from './PermissionForm';
-import GenericDataGrid from '../common/GenericDataGrid';
+import ReusableDataGrid from '../common/ReusableDataGrid';
 import PermissionFilters from './PermissionFilters';
 import SERVER_URL from '../common/BackendServerData';
 
@@ -11,504 +11,113 @@ function PermissionIndex() {
     name: '',
     description: ''
   });
- 
-  const [permissions, setPermissions] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [sortModel, setSortModel] = useState([]);
-  const [paginationModel, setPaginationModel] = useState({
-    pageSize: 10,
-    page: 0,
-  });
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState(null);
   const [selectedPermission, setSelectedPermission] = useState(null);
 
-  // Function to fetch data with current filters and pagination
-  const fetchData = useCallback(() => {
-    // Start building the query parameters
-    const params = new URLSearchParams({
-      page: paginationModel.page + 1,
-      pageSize: paginationModel.pageSize
-    });
-
-    // Add sorting if available
-    if (sortModel.length > 0) {
-      params.append('sortField', sortModel[0].field);
-      params.append('sortOrder', sortModel[0].sort);
+  // Define columns for the grid
+  const columns = [
+    { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'name', headerName: 'Permission Name', flex: 1 },
+    { field: 'description', headerName: 'Description', flex: 2 },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => (
+        <Box>
+          <Tooltip title="Edit Permission">
+            <IconButton onClick={() => handleEditClick(params.row)} size="small">
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Permission">
+            <IconButton onClick={() => handleDeleteClick(params.row)} size="small" color="error">
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )
     }
+  ];
 
-    // Add filters if they have values - using the exact format expected by the backend
-    const currentFilters = filters; // Use the current filters state
-    Object.entries(currentFilters).forEach(([key, value]) => {
-      if (value && value.toString().trim()) {
-        // Format the value based on the field
-        const filterValue = key === 'name' 
-          ? value.toString().trim().toUpperCase() 
-          : value.toString().trim();
-        
-        // Add filter parameters in the format expected by the backend
-        params.append('filterField', key);
-        params.append('filterValue', filterValue);
-        params.append('filterOperator', 'contains');
-      }
-    });
+  // Handle create button click
+  const handleCreateClick = () => {
+    setSelectedPermission(null);
+    setFormMode('create');
+    setIsFormOpen(true);
+  };
 
-    // Log the query parameters for debugging
-    console.log('Fetching permissions with params:', params.toString());
-    
-    // Set loading state
-    setLoading(true);
-    
-    // Make the API request with the formatted URL
-    const apiUrl = SERVER_URL + `/api/permissions/full?${params.toString()}`;
-    console.log('API URL:', apiUrl);
-    
-    fetch(apiUrl)
-      .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-          if (response.status === 404) {
-            setPermissions([]);
-            setTotalItems(0);
-            return null;
-          }
-          throw new Error(`Failed to fetch permissions: ${response.status}`);
-        }
-        return response.json();
+  // Handle edit button click
+  const handleEditClick = (permission) => {
+    setSelectedPermission(permission);
+    setFormMode('edit');
+    setIsFormOpen(true);
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = (permission) => {
+    if (window.confirm(`Are you sure you want to delete permission ${permission.name}?`)) {
+      fetch(`${SERVER_URL}/api/permissions/${permission.id}`, {
+        method: 'DELETE',
       })
-      .then(data => {
-        if (data) {
-          console.log('Received permissions data:', data);
-          
-          // Map the data to the expected format
-          const formattedPermissions = data.items.map(permission => ({
-            id: permission.id,
-            name: permission.name || '',
-            description: permission.description || ''
-          }));
-          
-          // Update state with the fetched data
-          setPermissions(formattedPermissions);
-          setTotalItems(data.total || 0);
-          setError(null);
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching permissions:', err);
-        setError(`Failed to load permissions: ${err.message}`);
-        setPermissions([]);
-        setTotalItems(0);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [paginationModel.page, paginationModel.pageSize, sortModel]); // Remove filters from dependencies
-
-  // Handle filter changes
-  const handleFiltersChange = (newFilters) => {
-    console.log('Filters changed:', newFilters);
-    setFilters(newFilters);
-    
-    // Only auto-refresh if ALL filters are empty
-    const hasActiveFilters = Object.values(newFilters).some(value => 
-      value && value.toString().trim() !== ''
-    );
-    
-    if (!hasActiveFilters) {
-      console.log('All filters are empty, auto-refreshing grid');
-      setPaginationModel(prevModel => ({
-        ...prevModel,
-        page: 0
-      }));
-      
-      // Use the fetchData function with empty filters
-      const params = new URLSearchParams({
-        page: 1, // Reset to first page
-        pageSize: paginationModel.pageSize
-      });
-
-      if (sortModel.length > 0) {
-        params.append('sortField', sortModel[0].field);
-        params.append('sortOrder', sortModel[0].sort);
-      }
-
-      console.log('Fetching all permissions with params:', params.toString());
-      setLoading(true);
-      
-      fetch(`${SERVER_URL}/api/permissions/full?${params.toString()}`)
         .then(response => {
           if (!response.ok) {
-            if (response.status === 404) {
-              setPermissions([]);
-              setTotalItems(0);
-              return null;
-            }
-            throw new Error(`Failed to fetch permissions: ${response.status}`);
+            throw new Error(`Failed to delete permission: ${response.status}`);
           }
-          return response.json();
+          return response.text();
         })
-        .then(data => {
-          if (data) {
-            const formattedPermissions = data.items.map(permission => ({
-              id: permission.id,
-              name: permission.name || '',
-              description: permission.description || ''
-            }));
-            
-            setPermissions(formattedPermissions);
-            setTotalItems(data.total || 0);
-            setError(null);
-          }
+        .then(() => {
+          // Refresh the grid after successful deletion
+          window.location.reload();
         })
         .catch(err => {
-          console.error('Error fetching permissions:', err);
-          setError(`Failed to load permissions: ${err.message}`);
-          setPermissions([]);
-          setTotalItems(0);
-        })
-        .finally(() => {
-          setLoading(false);
+          console.error('Error deleting permission:', err);
+          alert(`Failed to delete permission: ${err.message}`);
         });
     }
   };
 
-  // Handle search button click
-  const handleSearch = () => {
-    console.log('Search clicked with filters:', filters);
-    
-    // Reset to first page when searching
-    setPaginationModel(prevModel => ({
-      ...prevModel,
-      page: 0
-    }));
-    
-    // Build query parameters with current filters
-    const params = new URLSearchParams({
-      page: 1, // Reset to first page
-      pageSize: paginationModel.pageSize
-    });
-
-    // Add sorting if available
-    if (sortModel.length > 0) {
-      params.append('sortField', sortModel[0].field);
-      params.append('sortOrder', sortModel[0].sort);
-    }
-
-    // Add filters if they have values
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && value.toString().trim()) {
-        // Format the value based on the field
-        const filterValue = key === 'name' 
-          ? value.toString().trim().toUpperCase() 
-          : value.toString().trim();
-        
-        // Add filter parameters in the format expected by the backend
-        params.append('filterField', key);
-        params.append('filterValue', filterValue);
-        params.append('filterOperator', 'contains');
-      }
-    });
-
-    console.log('Searching permissions with params:', params.toString());
-    setLoading(true);
-    
-    const apiUrl = `${SERVER_URL}/api/permissions/full?${params.toString()}`;
-    console.log('Search API URL:', apiUrl);
-    
-    fetch(apiUrl)
-      .then(response => {
-        console.log('Search response status:', response.status);
-        if (!response.ok) {
-          if (response.status === 404) {
-            setPermissions([]);
-            setTotalItems(0);
-            return null;
-          }
-          throw new Error(`Failed to fetch permissions: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        if (data) {
-          console.log('Received search results:', data);
-          
-          // Map the data to the expected format
-          const formattedPermissions = data.items.map(permission => ({
-            id: permission.id,
-            name: permission.name || '',
-            description: permission.description || ''
-          }));
-          
-          // Update state with the fetched data
-          setPermissions(formattedPermissions);
-          setTotalItems(data.total || 0);
-          setError(null);
-        }
-      })
-      .catch(err => {
-        console.error('Error searching permissions:', err);
-        setError(`Failed to search permissions: ${err.message}`);
-        setPermissions([]);
-        setTotalItems(0);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  // Fetch data when component mounts or when pagination/sorting changes
-  useEffect(() => {
-    const params = new URLSearchParams({
-      page: paginationModel.page + 1,
-      pageSize: paginationModel.pageSize,
-    });
-  
-    // Add filters (name and description) to params using current filters state
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && value.toString().trim()) {
-        // For name, convert to uppercase if needed (as your backend expects)
-        const filterValue =
-          key === 'name'
-            ? value.toString().trim().toUpperCase()
-            : value.toString().trim();
-        params.append('filterField', key);
-        params.append('filterValue', filterValue);
-        params.append('filterOperator', 'contains');
-      }
-    });
-  
-    // Add sorting if available
-    if (sortModel.length > 0) {
-      params.append('sortField', sortModel[0].field);
-      params.append('sortOrder', sortModel[0].sort);
-    }
-  
-    console.log('Fetching permissions with params:', params.toString());
-    setLoading(true);
-  
-    const apiUrl = `${SERVER_URL}/api/permissions/full?${params.toString()}`;
-    console.log('Fetch API URL:', apiUrl);
-  
-    fetch(apiUrl)
-      .then(response => {
-        if (!response.ok) {
-          if (response.status === 404) {
-            setPermissions([]);
-            setTotalItems(0);
-            return null;
-          }
-          throw new Error(`Failed to fetch permissions: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        if (data) {
-          const formattedPermissions = data.items.map(permission => ({
-            id: permission.id,
-            name: permission.name || '',
-            description: permission.description || '',
-          }));
-          setPermissions(formattedPermissions);
-          setTotalItems(data.total || 0);
-          setError(null);
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching permissions:', err);
-        setError(`Failed to load permissions: ${err.message}`);
-        setPermissions([]);
-        setTotalItems(0);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [paginationModel.page, paginationModel.pageSize, sortModel, filters]);
-
-  const handleCreateClick = () => {
-    setFormMode('create');
-    setSelectedPermission(null);
-    setIsFormOpen(true);
-  };
-
-  const handleEditClick = (permission) => {
-    setFormMode('edit');
-    setSelectedPermission(permission);
-    setIsFormOpen(true);
-  };
-
-  const handleDeleteClick = (permission) => {
-    setFormMode('delete');
-    setSelectedPermission(permission);
-    setIsFormOpen(true);
-  };
-
-  const handleFormClose = () => {
+  // Handle form close
+  const handleFormClose = (refreshData) => {
     setIsFormOpen(false);
-    setSelectedPermission(null);
-    setFormMode(null);
-  };
-
-  const handleFormSubmit = async (formData) => {
-    try {
-      let response;
-      switch (formMode) {
-        case 'create':
-          response = await fetch(`${SERVER_URL}/api/permissions/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-          });
-          break;
-          
-        case 'edit':
-          response = await fetch(`${SERVER_URL}/api/permissions/${selectedPermission.id}/`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-          });
-          break;
-          
-        case 'delete':
-          response = await fetch(`${SERVER_URL}/api/permissions/${selectedPermission.id}/`, {
-            method: 'DELETE'
-          });
-          break;
-
-        default:
-          return;
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Operation failed');
-      }
-
-      await fetchData();
-      handleFormClose();
-    } catch (error) {
-      console.error('Operation failed:', error);
-      setError(error.message);
+    if (refreshData) {
+      window.location.reload();
     }
   };
 
-  const columns = [
-    { 
-      field: 'name', 
-      headerName: 'Permission Name',
-      description: 'System permission identifier',
-      flex: 1, 
-      minWidth: 180,
-      renderHeader: (params) => (
-        <Box>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Permission Name
-          </Typography>
-          <Typography variant="caption" color="textSecondary">
-            System permission identifier
-          </Typography>
-        </Box>
-      )
-    },
-    { 
-      field: 'description', 
-      headerName: 'Description',
-      description: 'Permission description and purpose',
-      flex: 2, 
-      minWidth: 250,
-      renderHeader: (params) => (
-        <Box>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Description
-          </Typography>
-          <Typography variant="caption" color="textSecondary">
-            Permission description and purpose
-          </Typography>
-        </Box>
-      )
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      flex: 0.7,
-      minWidth: 100,
-      sortable: false,
-      filterable: false,
-      disableColumnMenu: true,
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Edit Permission">
-            <IconButton
-              color="primary"
-              size="small"
-              onClick={() => handleEditClick(params.row)}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete Permission">
-            <IconButton
-              color="error"
-              size="small"
-              onClick={() => handleDeleteClick(params.row)}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      ),
-    },
-  ];
+  // Handle form submit
+  const handleFormSubmit = () => {
+    setIsFormOpen(false);
+    window.location.reload();
+  };
 
   return (
-    <>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      <GenericDataGrid
+    <Box sx={{ height: '100%', width: '100%', p: 2 }}>
+      <ReusableDataGrid
         title="Permissions Management"
-        rows={permissions}
         columns={columns}
-        loading={loading}
-        totalRows={totalItems}
+        apiEndpoint="/api/permissions/full"
+        initialFilters={filters}
+        FiltersComponent={PermissionFilters}
         createButtonText="Permission"
         onCreateClick={handleCreateClick}
-        paginationModel={paginationModel}
-        onPaginationModelChange={(newModel) => {
-          console.log('Pagination model changed:', newModel);
-          setPaginationModel(newModel);
-        }}
-        sortModel={sortModel}
-        onSortModelChange={(newModel) => {
-          console.log('Sort model changed:', newModel);
-          setSortModel(newModel);
-          fetchData(filters);
-        }}
-        showQuickFilter={false}
-        CustomFilterComponent={PermissionFilters}
-        filters={filters}
-        onFiltersChange={handleFiltersChange}
-        onSearch={handleSearch}
-        paginationMode="server"
-        sortingMode="server"
-        filterMode="server"
+        onEditClick={handleEditClick}
+        onDeleteClick={handleDeleteClick}
       />
 
-      <PermissionForm
-        open={isFormOpen}
-        onClose={handleFormClose}
-        permission={selectedPermission}
-        onSubmit={handleFormSubmit}
-        mode={formMode}
-      />
-    </>
+      {isFormOpen && (
+        <PermissionForm
+          open={isFormOpen}
+          onClose={handleFormClose}
+          permission={selectedPermission}
+          onSubmit={handleFormSubmit}
+          mode={formMode}
+        />
+      )}
+    </Box>
   );
 }
 

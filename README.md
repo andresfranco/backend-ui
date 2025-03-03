@@ -4,6 +4,22 @@ This is a React 19 admin panel application with user and role management feature
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Key Components
+
+### Reusable Data Grid
+
+The application features a reusable data grid component that can be integrated into various parts of the application. This component provides a standardized way to display tabular data with features like filtering, sorting, and pagination, all connected to a FastAPI backend.
+
+Key features of the reusable grid:
+- Dynamic column configuration
+- Server-side filtering, sorting, and pagination
+- Support for multiple filter types (text, multiselect, etc.)
+- Customizable filter components
+- Create, edit, and delete actions
+- Responsive design
+
+For detailed documentation on how to use the reusable grid component, see [Reusable Grid Documentation](./src/docs/reusable_grid_documentation.md).
+
 ## Available Scripts
 
 In the project directory, you can run:
