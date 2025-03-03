@@ -7,14 +7,12 @@ const FILTER_TYPES = {
   name: {
     label: 'Permission Name',
     type: 'text',
-    placeholder: 'Search by permission name (e.g., CREATE_USER)',
-    transform: value => value // Store raw value, transform when searching
+    placeholder: 'Search by permission name (e.g., CREATE_USER)'
   },
   description: {
     label: 'Description',
     type: 'text',
-    placeholder: 'Search by description',
-    transform: value => value // Store raw value, transform when searching
+    placeholder: 'Search by description'
   }
 };
 
@@ -43,43 +41,46 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
     // Initialize nextFilterId based on the number of active filters
     return activeFilters.length + 1;
   });
+  
   const [tempFilters, setTempFilters] = useState(() => {
-    const initialFilters = { ...filters };
-    // Ensure permission is always an array
-    if (!Array.isArray(initialFilters.permission)) {
-      initialFilters.permission = initialFilters.permission ? [initialFilters.permission] : [];
-    }
-    return initialFilters;
+    return { ...filters };
   });
   
-   // Update tempFilters when filters prop changes
-   useEffect(() => {
-    const updatedFilters = { ...filters };
-    setTempFilters(updatedFilters);
+  // Update tempFilters when filters prop changes
+  useEffect(() => {
+    if (filters) {
+      const updatedFilters = { ...filters };
+      setTempFilters(updatedFilters);
+    }
   }, [filters]);
 
   // Update activeFilters when filters prop changes
   useEffect(() => {
-    const updatedFilters = [];
-    let id = 1;
-    let hasActiveFilters = false;
-    
-    // First, try to maintain existing filter types
-    activeFilters.forEach(filter => {
-      if (FILTER_TYPES[filter.type]) {
-        updatedFilters.push({ id: id++, type: filter.type });
-        hasActiveFilters = true;
+    if (filters) {
+      const updatedFilters = [];
+      let id = 1;
+      
+      // Add active filters for non-empty filter values
+      Object.entries(filters).forEach(([type, value]) => {
+        if (FILTER_TYPES[type]) {
+          const hasValue = Boolean(value && value.toString().trim() !== '');
+          if (hasValue) {
+            updatedFilters.push({ id: id++, type });
+          }
+        }
+      });
+      
+      // If no active filters, add a default one
+      if (updatedFilters.length === 0) {
+        // Find the first available filter type
+        const firstType = Object.keys(FILTER_TYPES)[0];
+        updatedFilters.push({ id: id, type: firstType });
       }
-    });
-    
-    // If no active filters, add a default one
-    if (!hasActiveFilters) {
-      updatedFilters.push({ id: id, type: 'name' });
+      
+      setActiveFilters(updatedFilters);
+      setNextFilterId(id + 1);
     }
-    
-    setActiveFilters(updatedFilters);
-    setNextFilterId(id + 1);
-  }, [filters]);
+  }, []);
 
   const handleAddFilter = () => {
     const unusedFilterTypes = Object.keys(FILTER_TYPES).filter(type => 
@@ -132,6 +133,30 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
       setTempFilters(updatedFilterValues);
     }
   };
+  
+  const handleSearch = () => {
+    // Create a clean copy of filters with only non-empty values
+    const cleanFilters = {};
+    
+    Object.entries(tempFilters).forEach(([key, value]) => {
+      if (value && value.toString().trim() !== '') {
+        cleanFilters[key] = value;
+      }
+    });
+    
+    console.log('Searching with filters:', cleanFilters);
+    
+    // Update parent component with new filters
+    if (onFiltersChange) {
+      onFiltersChange(cleanFilters);
+    }
+    
+    // Trigger search
+    if (onSearch) {
+      onSearch(cleanFilters);
+    }
+  };
+
   const renderFilterInput = (filter) => {
     const filterType = FILTER_TYPES[filter.type];
     return (
@@ -148,71 +173,69 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
+    <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          Filters
+        </Typography>
+        <Tooltip title="Add Filter">
+          <IconButton 
+            onClick={handleAddFilter} 
+            disabled={Object.keys(FILTER_TYPES).length <= activeFilters.length}
+            color="primary"
+          >
+            <AddFilterIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      
       <Stack spacing={2}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="subtitle1" fontWeight="bold">
-            Filters
-          </Typography>
-          {Object.keys(FILTER_TYPES).length > activeFilters.length && (
-            <Tooltip title="Add filter">
-              <IconButton onClick={handleAddFilter} color="primary">
-                <AddFilterIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-        <Stack spacing={2}>
-          {activeFilters.map((filter) => (
-            <Box key={filter.id} sx={{ display: 'flex', gap: 2, alignItems: 'start' }}>
-              <FormControl sx={{ minWidth: 150 }}>
-                <InputLabel>Filter Type</InputLabel>
-                <Select
-                  value={filter.type}
-                  onChange={(e) => handleFilterTypeChange(filter.id, e.target.value)}
-                  size="small"
-                  label="Filter Type"
-                >
-                  {Object.entries(FILTER_TYPES).map(([type, config]) => (
-                    <MenuItem
-                      key={type}
-                      value={type}
-                      disabled={activeFilters.some(f => f.id !== filter.id && f.type === type)}
-                    >
-                      {config.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {renderFilterInput(filter)}
-
+        {activeFilters.map((filter) => (
+          <Box key={filter.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FormControl sx={{ width: 150 }} size="small">
+              <InputLabel>Filter Type</InputLabel>
+              <Select
+                value={filter.type}
+                onChange={(e) => handleFilterTypeChange(filter.id, e.target.value)}
+                label="Filter Type"
+                size="small"
+              >
+                {Object.entries(FILTER_TYPES).map(([type, config]) => (
+                  <MenuItem 
+                    key={type} 
+                    value={type}
+                    disabled={activeFilters.some(f => f.id !== filter.id && f.type === type)}
+                  >
+                    {config.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {renderFilterInput(filter)}
+            
+            <Tooltip title="Remove Filter">
               <IconButton 
                 onClick={() => handleRemoveFilter(filter.id)}
-                sx={{ mt: 1 }}
                 disabled={activeFilters.length <= 1}
+                color="error"
+                sx={{ flexShrink: 0 }}
               >
                 <CloseIcon />
               </IconButton>
-            </Box>
-          ))}
-        </Stack>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
-        <Button
-        variant="contained"
-        color="primary"
-        startIcon={<SearchIcon />}
-        onClick={() => {
-          console.log('Search button clicked with filters:', tempFilters);
-          onFiltersChange(tempFilters);
-          if (onSearch) {
-            onSearch(tempFilters);
-          }
-        }}
-        sx={{ minWidth: 120 }}
-       >
-        Search
-      </Button>
+            </Tooltip>
+          </Box>
+        ))}
+        
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleSearch}
+            startIcon={<SearchIcon />}
+          >
+            Search
+          </Button>
         </Box>
       </Stack>
     </Paper>

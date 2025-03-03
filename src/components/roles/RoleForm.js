@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {Dialog,DialogTitle,DialogContent,DialogActions,TextField,Button,Box,FormControl,InputLabel,Select,MenuItem,Typography,Chip,Stack,Alert} from '@mui/material';
 import SERVER_URL from '../common/BackendServerData';
+
 function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -45,9 +46,7 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
         name: role.name || '',
         description: role.description || '',
         permissions: Array.isArray(role.permissions)
-          ? role.permissions.map(permission =>
-              typeof permission === 'object' ? permission.name : permission
-            )
+          ? role.permissions
           : []
       });
     } else {
@@ -76,22 +75,58 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError('');
-    if (validateForm()) {
-      // Log the form data being submitted
-      console.log('Submitting role with permissions:', formData.permissions);
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    // Log the form data being submitted
+    console.log('Submitting role with permissions:', formData.permissions);
+    
+    // Create a copy of the form data to ensure we're not modifying the original
+    const submissionData = {
+      ...formData,
+      // Ensure permissions is an array of strings
+      permissions: Array.isArray(formData.permissions) ? formData.permissions : []
+    };
+    
+    console.log('Final submission data:', submissionData);
+    
+    try {
+      let url, method;
       
-      // Create a copy of the form data to ensure we're not modifying the original
-      const submissionData = {
-        ...formData,
-        // Ensure permissions is an array of strings
-        permissions: Array.isArray(formData.permissions) ? formData.permissions : []
-      };
+      if (mode === 'create') {
+        url = `${SERVER_URL}/api/roles/`;
+        method = 'POST';
+      } else if (mode === 'edit') {
+        url = `${SERVER_URL}/api/roles/${role.id}`;
+        method = 'PUT';
+      } else if (mode === 'delete') {
+        url = `${SERVER_URL}/api/roles/${role.id}`;
+        method = 'DELETE';
+      }
       
-      console.log('Final submission data:', submissionData);
-      onSubmit(submissionData);
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: method !== 'DELETE' ? JSON.stringify(submissionData) : undefined,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to ${mode} role: ${response.status}`);
+      }
+      
+      // Close the form and refresh data
+      onClose(true);
+    } catch (error) {
+      console.error(`Error ${mode}ing role:`, error);
+      setApiError(error.message);
     }
   };
 
@@ -127,7 +162,7 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={() => onClose(false)}
       maxWidth="sm"
       fullWidth
     >
@@ -209,7 +244,7 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button 
-            onClick={onClose}
+            onClick={() => onClose(false)}
             variant="contained"
             sx={{ 
               bgcolor: 'grey.300',

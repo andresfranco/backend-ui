@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, IconButton, Tooltip, Chip } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import RoleForm from './RoleForm';
@@ -16,6 +16,7 @@ function RoleIndex() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState(null);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [gridKey, setGridKey] = useState(0); // Added gridKey state to force refresh
 
   // Define columns for the grid
   const columns = [
@@ -32,8 +33,8 @@ function RoleIndex() {
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {permissions.slice(0, 3).map((permission) => (
               <Chip 
-                key={permission.id} 
-                label={permission.name} 
+                key={permission} 
+                label={permission} 
                 size="small" 
                 variant="outlined"
               />
@@ -51,16 +52,11 @@ function RoleIndex() {
       }
     },
     {
-      field: 'users',
+      field: 'users_count',
       headerName: 'Users',
       width: 80,
       renderCell: (params) => {
-        const count = typeof params.value === 'number' 
-          ? params.value 
-          : Array.isArray(params.value) 
-            ? params.value.length 
-            : 0;
-        return <span>{count}</span>;
+        return <span>{params.value || 0}</span>;
       }
     },
     {
@@ -101,44 +97,29 @@ function RoleIndex() {
 
   // Handle delete button click
   const handleDeleteClick = (role) => {
-    if (window.confirm(`Are you sure you want to delete role ${role.name}?`)) {
-      fetch(`${SERVER_URL}/api/roles/${role.id}`, {
-        method: 'DELETE',
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed to delete role: ${response.status}`);
-          }
-          return response.text();
-        })
-        .then(() => {
-          // Refresh the grid after successful deletion
-          window.location.reload();
-        })
-        .catch(err => {
-          console.error('Error deleting role:', err);
-          alert(`Failed to delete role: ${err.message}`);
-        });
-    }
+    setSelectedRole(role);
+    setFormMode('delete');
+    setIsFormOpen(true);
   };
 
   // Handle form close
   const handleFormClose = (refreshData) => {
     setIsFormOpen(false);
     if (refreshData) {
-      window.location.reload();
+      // Refresh the grid by incrementing the key
+      setGridKey(prevKey => prevKey + 1);
     }
   };
 
-  // Handle form submit
-  const handleFormSubmit = () => {
-    setIsFormOpen(false);
-    window.location.reload();
-  };
+  // Handle filter changes
+  const handleFiltersChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+  }, []);
 
   return (
     <Box sx={{ height: '100%', width: '100%', p: 2 }}>
       <ReusableDataGrid
+        key={gridKey} // Force refresh when key changes
         title="Roles Management"
         columns={columns}
         apiEndpoint="/api/roles/full"
@@ -155,7 +136,6 @@ function RoleIndex() {
           open={isFormOpen}
           onClose={handleFormClose}
           role={selectedRole}
-          onSubmit={handleFormSubmit}
           mode={formMode}
         />
       )}

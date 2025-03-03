@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import PermissionForm from './PermissionForm';
 import ReusableDataGrid from '../common/ReusableDataGrid';
 import PermissionFilters from './PermissionFilters';
-import SERVER_URL from '../common/BackendServerData';
 
 function PermissionIndex() {
   const [filters, setFilters] = useState({
@@ -15,6 +14,7 @@ function PermissionIndex() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState(null);
   const [selectedPermission, setSelectedPermission] = useState(null);
+  const [gridKey, setGridKey] = useState(0);
 
   // Define columns for the grid
   const columns = [
@@ -59,44 +59,28 @@ function PermissionIndex() {
 
   // Handle delete button click
   const handleDeleteClick = (permission) => {
-    if (window.confirm(`Are you sure you want to delete permission ${permission.name}?`)) {
-      fetch(`${SERVER_URL}/api/permissions/${permission.id}`, {
-        method: 'DELETE',
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed to delete permission: ${response.status}`);
-          }
-          return response.text();
-        })
-        .then(() => {
-          // Refresh the grid after successful deletion
-          window.location.reload();
-        })
-        .catch(err => {
-          console.error('Error deleting permission:', err);
-          alert(`Failed to delete permission: ${err.message}`);
-        });
-    }
+    setSelectedPermission(permission);
+    setFormMode('delete');
+    setIsFormOpen(true);
   };
 
   // Handle form close
   const handleFormClose = (refreshData) => {
     setIsFormOpen(false);
     if (refreshData) {
-      window.location.reload();
+      setGridKey(prevKey => prevKey + 1);
     }
   };
 
-  // Handle form submit
-  const handleFormSubmit = () => {
-    setIsFormOpen(false);
-    window.location.reload();
-  };
+  // Handle filter changes
+  const handleFiltersChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+  }, []);
 
   return (
     <Box sx={{ height: '100%', width: '100%', p: 2 }}>
       <ReusableDataGrid
+        key={gridKey}
         title="Permissions Management"
         columns={columns}
         apiEndpoint="/api/permissions/full"
@@ -113,7 +97,6 @@ function PermissionIndex() {
           open={isFormOpen}
           onClose={handleFormClose}
           permission={selectedPermission}
-          onSubmit={handleFormSubmit}
           mode={formMode}
         />
       )}

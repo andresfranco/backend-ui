@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {Dialog,DialogTitle,DialogContent,DialogActions,TextField,Button,Box,Typography,Alert} from '@mui/material';
+import SERVER_URL from '../common/BackendServerData';
 
-function PermissionForm({ open, onClose, permission, onSubmit, mode = 'create' }) {
+function PermissionForm({ open, onClose, permission, mode = 'create' }) {
   const [formData, setFormData] = useState({
     name: '',
     description: ''
@@ -42,11 +43,46 @@ function PermissionForm({ open, onClose, permission, onSubmit, mode = 'create' }
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError('');
-    if (validateForm()) {
-      onSubmit(formData);
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    try {
+      let url, method;
+      
+      if (mode === 'create') {
+        url = `${SERVER_URL}/api/permissions/`;
+        method = 'POST';
+      } else if (mode === 'edit') {
+        url = `${SERVER_URL}/api/permissions/${permission.id}`;
+        method = 'PUT';
+      } else if (mode === 'delete') {
+        url = `${SERVER_URL}/api/permissions/${permission.id}`;
+        method = 'DELETE';
+      }
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: method !== 'DELETE' ? JSON.stringify(formData) : undefined,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to ${mode} permission: ${response.status}`);
+      }
+      
+      // Close the form and refresh data
+      onClose(true);
+    } catch (error) {
+      console.error(`Error ${mode}ing permission:`, error);
+      setApiError(error.message);
     }
   };
 
@@ -70,7 +106,7 @@ function PermissionForm({ open, onClose, permission, onSubmit, mode = 'create' }
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={() => onClose(false)}
       maxWidth="sm"
       fullWidth
     >
@@ -116,7 +152,7 @@ function PermissionForm({ open, onClose, permission, onSubmit, mode = 'create' }
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button 
-            onClick={onClose}
+            onClick={() => onClose(false)}
             variant="contained"
             sx={{ 
               bgcolor: 'grey.300',
