@@ -124,27 +124,26 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
     const updatedActiveFilters = activeFilters.filter(f => f.id !== filterId);
     setActiveFilters(updatedActiveFilters);
     
-    // Clear the removed filter's value
     const removedFilter = activeFilters.find(f => f.id === filterId);
     if (removedFilter) {
       const updatedFilterValues = { ...tempFilters };
-      delete updatedFilterValues[removedFilter.type];
+      if (removedFilter.type === 'permission') {
+        updatedFilterValues[removedFilter.type] = [];
+      } else {
+        delete updatedFilterValues[removedFilter.type];
+      }
       setTempFilters(updatedFilterValues);
-      // Propagate the updated filters to the parent immediately
-      onFiltersChange(updatedFilterValues);
     }
   };
 
   const handleFilterChange = (filterId, value) => {
     const filter = activeFilters.find(f => f.id === filterId);
     if (filter) {
-      const updatedFilters = {
-        ...filters,
+      const updatedTempFilters = {
+        ...tempFilters,
         [filter.type]: value
       };
-      
-      console.log('Filter changed:', filter.type, value);
-      onFiltersChange(updatedFilters);
+      setTempFilters(updatedTempFilters);
     }
   };
 
@@ -195,9 +194,6 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
             )}
             size="small"
           >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
             {availablePermissions.map((permission) => (
               <MenuItem key={permission.id} value={permission.name}>
                 {permission.name}

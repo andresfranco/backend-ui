@@ -235,67 +235,85 @@ function RoleIndex() {
       .finally(() => {
         setLoading(false);
       });
-  }, [filters, paginationModel.pageSize, sortModel]);
+  }, [paginationModel.page, paginationModel.pageSize, sortModel, filters]);
   
 
-  // Fetch data when component mounts or when pagination/sorting changes
   useEffect(() => {
-    // Create a function that doesn't depend on filters
-    const initialFetch = () => {
-      const params = new URLSearchParams({
-        page: paginationModel.page + 1,
-        pageSize: paginationModel.pageSize
-      });
-
-      if (sortModel.length > 0) {
-        params.append('sortField', sortModel[0].field);
-        params.append('sortOrder', sortModel[0].sort);
-      }
-
-      console.log('Initial fetch with params:', params.toString());
-      setLoading(true);
-      
-      fetch(`${SERVER_URL}/api/roles/full?${params.toString()}`)
-        .then(response => {
-          if (!response.ok) {
-            if (response.status === 404) {
-              setRoles([]);
-              setTotalUsers(0);
-              return null;
-            }
-            throw new Error(`Failed to fetch roles: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data) {
-            const formattedRoles = data.items.map(role => ({
-              id: role.id,
-              name: role.name || '',
-              description: role.description || '',
-              permissions: Array.isArray(role.permissions) ? role.permissions : [],
-              users: typeof role.users === 'number' ? role.users : 
-                    Array.isArray(role.users) ? role.users.length : 0
-            }));
-            
-            setRoles(formattedRoles);
-            setTotalUsers(data.total || 0);
-            setError(null);
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching roles:', err);
-          setError('Failed to load roles');
-          setRoles([]);
-          setTotalUsers(0);
-        })
-        .finally(() => {
-          setLoading(false);
+    const params = new URLSearchParams({
+      page: paginationModel.page + 1,
+      pageSize: paginationModel.pageSize
+    });
+  
+    // Add filters to the URL using the current filters state.
+    Object.entries(filters).forEach(([key, value]) => {
+      if (key === 'permission' && Array.isArray(value) && value.length > 0) {
+        // For the permission filter, add each value as a separate filter parameter.
+        value.forEach(permission => {
+          params.append('filterField', 'permission');
+          params.append('filterValue', permission);
+          params.append('filterOperator', 'equals');
         });
-    };
-
-    initialFetch();
-  }, [paginationModel.page, paginationModel.pageSize, sortModel]);
+      } else if (value && (!Array.isArray(value) && value.toString().trim())) {
+        params.append('filterField', key);
+        params.append('filterValue', value.toString().trim());
+        params.append('filterOperator', 'contains');
+      }
+    });
+  
+    // Add sorting if available
+    if (sortModel.length > 0) {
+      params.append('sortField', sortModel[0].field);
+      params.append('sortOrder', sortModel[0].sort);
+    }
+  
+    console.log('Fetching roles with params:', params.toString());
+    setLoading(true);
+  
+    const apiUrl = `${SERVER_URL}/api/roles/full?${params.toString()}`;
+    console.log('Fetch API URL:', apiUrl);
+  
+    fetch(apiUrl)
+      .then(response => {
+        if (!response.ok) {
+          if (response.status === 404) {
+            setRoles([]);
+            setTotalUsers(0);
+            return null;
+          }
+          throw new Error(`Failed to fetch roles: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data) {
+          const formattedRoles = data.items.map(role => ({
+            id: role.id,
+            name: role.name || '',
+            description: role.description || '',
+            permissions: Array.isArray(role.permissions) ? role.permissions : [],
+            users: typeof role.users === 'number'
+              ? role.users
+              : Array.isArray(role.users)
+              ? role.users.length
+              : 0,
+          }));
+          
+          setRoles(formattedRoles);
+          setTotalUsers(data.total || 0);
+          setError(null);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching roles:', err);
+        setError('Failed to load roles');
+        setRoles([]);
+        setTotalUsers(0);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [paginationModel.page, paginationModel.pageSize, sortModel, filters]);
+  
 
   const handleCreateClick = () => {
     setFormMode('create');
@@ -521,7 +539,12 @@ function RoleIndex() {
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
         sortModel={sortModel}
-        onSortModelChange={setSortModel}
+        onSortModelChange={(newModel) => {
+          console.log('Sort model changed:', newModel);
+          setSortModel(newModel);
+          // Immediately fetch data using the current filters and new sort parameters
+          fetchData(filters);
+        }}
         showQuickFilter={false}
         CustomFilterComponent={RoleFilters}
         filters={filters}
