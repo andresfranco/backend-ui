@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,ToggleButton,ToggleButtonGroup,Button,Tooltip,Chip} from '@mui/material';
+import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,Button,Tooltip,Chip,OutlinedInput} from '@mui/material';
 import {Search as SearchIcon,AddCircleOutline as AddFilterIcon,Close as CloseIcon} from '@mui/icons-material';
 import SERVER_URL from '../common/BackendServerData';
 // Filter type definitions
@@ -14,25 +14,99 @@ const FILTER_TYPES = {
   },
   roles: {
     label: 'Roles',
-    type: 'roles'
+    type: 'multiselect'
   }
 };
 
 function UserFilters({ filters, onFiltersChange, onSearch }) {
+  const [activeFilters, setActiveFilters] = useState(() => {
+    const initialFilters = [];
+    let id = 1;
+    
+    // Create active filters for each non-empty filter in the filters prop
+    Object.entries(filters || {}).forEach(([type, value]) => {
+      if (FILTER_TYPES[type]) {
+        initialFilters.push({ id: id++, type });
+      }
+    });
+    
+    // If no filters were created, add a default one
+    if (initialFilters.length === 0) {
+      initialFilters.push({ id: id, type: 'name' });
+    }
+    
+    return initialFilters;
+  }); 
+  const [nextFilterId, setNextFilterId] = useState(() => {
+    // Initialize nextFilterId based on the number of active filters
+    return activeFilters.length + 1;
+  });
   const [availableRoles, setAvailableRoles] = useState([]);
-  const [activeFilters, setActiveFilters] = useState([{ id: 1, type: 'username' }]);
-  const [nextFilterId, setNextFilterId] = useState(2);
-  const [roleFilterCondition, setRoleFilterCondition] = useState('OR');
+  const [tempFilters, setTempFilters] = useState(() => {
+    const initialFilters = { ...filters };
+    // Ensure roles is always an array
+    if (!Array.isArray(initialFilters.roles)) {
+      initialFilters.roles = initialFilters.roles ? [initialFilters.roles] : [];
+    }
+    return initialFilters;
+  });
 
-  // Fetch available roles
+  // Fetch roles for the dropdown
   useEffect(() => {
-    fetch(`${SERVER_URL}/api/roles/`)
-      .then(response => response.json())
-      .then(data => {
-        setAvailableRoles(data);
-      })
-      .catch(error => console.error('Error fetching roles:', error));
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${SERVER_URL}/api/roles/full`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableRoles(data.items || []);
+        } else {
+          console.error('Failed to fetch roles');
+        }
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+      }
+    };
+
+    fetchRoles();
   }, []);
+
+  // Update tempFilters when filters prop changes
+  useEffect(() => {
+    const updatedFilters = { ...filters };
+    // Ensure roles is always an array
+    if (!Array.isArray(updatedFilters.roles)) {
+      updatedFilters.roles = updatedFilters.roles ? [updatedFilters.roles] : [];
+    }
+    setTempFilters(updatedFilters);
+  }, [filters]);
+
+  
+   // Update activeFilters when filters prop changes
+   useEffect(() => {
+    setActiveFilters(prevActiveFilters => {
+      const updatedFilters = [];
+      let id = 1;
+      let hasActiveFilters = false;
+      
+      // Use the previous activeFilters value
+      prevActiveFilters.forEach(filter => {
+        if (FILTER_TYPES[filter.type]) {
+          updatedFilters.push({ id: id++, type: filter.type });
+          hasActiveFilters = true;
+        }
+      });
+      
+      // If no active filters, add a default one
+      if (!hasActiveFilters) {
+        updatedFilters.push({ id: id, type: 'name' });
+      }
+      
+      // Update nextFilterId based on the new id
+      setNextFilterId(id + 1);
+      return updatedFilters;
+    });
+  }, [filters]);
+  
 
   const handleAddFilter = () => {
     const unusedFilterTypes = Object.keys(FILTER_TYPES).filter(type => 
@@ -46,58 +120,97 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
   };
 
   const handleRemoveFilter = (filterId) => {
-    const updatedFilters = activeFilters.filter(f => f.id !== filterId);
-    setActiveFilters(updatedFilters);
+    const updatedActiveFilters = activeFilters.filter(f => f.id !== filterId);
+    setActiveFilters(updatedActiveFilters);
     
-    // Clear the removed filter's value
     const removedFilter = activeFilters.find(f => f.id === filterId);
     if (removedFilter) {
-      onFiltersChange({
-        ...filters,
-        [removedFilter.type]: undefined
-      });
+      const updatedFilterValues = { ...tempFilters };
+      if (removedFilter.type === 'roles') {
+        updatedFilterValues[removedFilter.type] = [];
+      } else {
+        delete updatedFilterValues[removedFilter.type];
+      }
+      setTempFilters(updatedFilterValues);
     }
   };
+  
+  
 
   const handleFilterChange = (filterId, value) => {
     const filter = activeFilters.find(f => f.id === filterId);
     if (filter) {
-      onFiltersChange({
-        ...filters,
-        [filter.type]: value,
-        ...(filter.type === 'roles' ? { roleFilterCondition } : {})
-      });
+      const updatedTempFilters = {
+        ...tempFilters,
+        [filter.type]: value
+      };
+      setTempFilters(updatedTempFilters);
+      // Remove the immediate call to onFiltersChange here.
     }
   };
+  
 
   const handleFilterTypeChange = (filterId, newType) => {
+    // Find the old filter type
+    const oldFilter = activeFilters.find(f => f.id === filterId);
+    const oldType = oldFilter ? oldFilter.type : null;
+    
+    // Update the filter type
     setActiveFilters(activeFilters.map(f => 
       f.id === filterId ? { ...f, type: newType } : f
     ));
     
     // Clear the old filter value
-    const oldFilter = activeFilters.find(f => f.id === filterId);
-    if (oldFilter) {
-      onFiltersChange({
-        ...filters,
-        [oldFilter.type]: undefined
-      });
+    if (oldType) {
+      const updatedFilterValues = { ...tempFilters };
+      delete updatedFilterValues[oldType];
+      setTempFilters(updatedFilterValues);
     }
   };
 
-  const handleRoleFilterConditionChange = (event, newCondition) => {
-    if (newCondition !== null) {
-      setRoleFilterCondition(newCondition);
-      // Update filters to include the new condition
-      if (filters.roles?.length > 0) {
-        onFiltersChange({
-          ...filters,
-          roleFilterCondition: newCondition
-        });
-      }
+  const renderFilterInput = (filter) => {
+    const filterType = FILTER_TYPES[filter.type];
+    
+    if (filterType.type === 'multiselect' && filter.type === 'roles') {
+      return (
+        <FormControl sx={{ flex: 1 }}>
+          <InputLabel>Select Roles</InputLabel>
+          <Select
+            multiple
+            value={tempFilters[filter.type] || []}
+            onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+            input={<OutlinedInput label="Select Roles" />}
+            renderValue={(selected) => (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selected.map((value) => (
+                  <Chip key={value} label={availableRoles.find(role => role.id === value)?.name} />
+                ))}
+              </Box>
+            )}
+            size="small"
+          >
+            {availableRoles.map((role) => (
+              <MenuItem key={role.id} value={role.id}>
+                {role.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      );
     }
+    
+    return (
+      <TextField
+        type={filterType.type}
+        label={filterType.label}
+        placeholder={filterType.placeholder}
+        size="small"
+        value={tempFilters[filter.type] || ''}
+        onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+        sx={{ flex: 1 }}
+      />
+    );
   };
-
   return (
     <Paper sx={{ p: 2 }}>
       <Stack spacing={2}>
@@ -136,65 +249,12 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
                 </Select>
               </FormControl>
 
-              {filter.type === 'roles' ? (
-                <Box sx={{ display: 'flex', flex: 1, gap: 2, alignItems: 'start' }}>
-                  <FormControl sx={{ flex: 1 }}>
-                    <InputLabel>Select Roles</InputLabel>
-                    <Select
-                      multiple
-                      value={filters.roles || []}
-                      onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-                      label="Select Roles"
-                      size="small"
-                      renderValue={(selected) => (
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {selected.map((value) => (
-                            <Chip
-                              key={value}
-                              label={availableRoles.find(role => role.id === value)?.name}
-                              size="small"
-                            />
-                          ))}
-                        </Box>
-                      )}
-                    >
-                      {availableRoles.map((role) => (
-                        <MenuItem key={role.id} value={role.id}>
-                          {role.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  {filters.roles?.length > 1 && (
-                    <ToggleButtonGroup
-                      value={roleFilterCondition}
-                      exclusive
-                      onChange={handleRoleFilterConditionChange}
-                      size="small"
-                      sx={{ mt: 1 }}
-                    >
-                      <ToggleButton value="OR" aria-label="OR condition">
-                        OR
-                      </ToggleButton>
-                      <ToggleButton value="AND" aria-label="AND condition">
-                        AND
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  )}
-                </Box>
-              ) : (
-                <TextField
-                  label={FILTER_TYPES[filter.type].label}
-                  size="small"
-                  value={filters[filter.type] || ''}
-                  onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-                  sx={{ flex: 1 }}
-                />
-              )}
+              {renderFilterInput(filter)}
 
               <IconButton 
                 onClick={() => handleRemoveFilter(filter.id)}
                 sx={{ mt: 1 }}
+                disabled={activeFilters.length <= 1}
               >
                 <CloseIcon />
               </IconButton>
@@ -202,14 +262,21 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
           ))}
         </Stack>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<SearchIcon />}
-            onClick={onSearch}
-            sx={{ minWidth: 120 }}
-          >
-            Search
-          </Button>
+        <Button
+        variant="contained"
+        color="primary"
+        startIcon={<SearchIcon />}
+        onClick={() => {
+          // Propagate the tempFilters as the applied filters
+          onFiltersChange(tempFilters);
+          if (onSearch) {
+            onSearch(tempFilters);
+          }
+        }}
+        sx={{ minWidth: 120 }}
+       >
+        Search
+      </Button>
         </Box>
       </Stack>
     </Paper>

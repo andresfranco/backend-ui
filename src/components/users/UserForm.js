@@ -14,41 +14,22 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
   const [apiError, setApiError] = useState('');
 
   useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${SERVER_URL}/api/roles/full`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch roles');
+        }
+        const data = await response.json();
+        setAvailableRoles(data.items || []);
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+        setApiError('Failed to load roles');
+      }
+    };
+
     fetchRoles();
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        username: user.username || '',
-        email: user.email || '',
-        password: '', // Don't populate password in edit mode
-        roles: Array.isArray(user.roles) ? user.roles : []
-      });
-    } else {
-      setFormData({
-        username: '',
-        email: '',
-        password: '',
-        roles: []
-      });
-    }
-  }, [user]);
-
-  const fetchRoles = async () => {
-    try {
-      const response = await fetch(`${SERVER_URL}/api/roles/`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch roles');
-      }
-      const data = await response.json();
-      // Handle paginated response format
-      setAvailableRoles(data.items || []);
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-      setApiError('Failed to load roles');
-    }
-  };
 
   const validateForm = () => {
     const newErrors = {};
