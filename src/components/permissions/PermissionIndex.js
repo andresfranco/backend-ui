@@ -260,59 +260,71 @@ function PermissionIndex() {
 
   // Fetch data when component mounts or when pagination/sorting changes
   useEffect(() => {
-    // Create a function that doesn't depend on filters
-    const initialFetch = () => {
-      const params = new URLSearchParams({
-        page: paginationModel.page + 1,
-        pageSize: paginationModel.pageSize
-      });
-
-      if (sortModel.length > 0) {
-        params.append('sortField', sortModel[0].field);
-        params.append('sortOrder', sortModel[0].sort);
+    const params = new URLSearchParams({
+      page: paginationModel.page + 1,
+      pageSize: paginationModel.pageSize,
+    });
+  
+    // Add filters (name and description) to params using current filters state
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && value.toString().trim()) {
+        // For name, convert to uppercase if needed (as your backend expects)
+        const filterValue =
+          key === 'name'
+            ? value.toString().trim().toUpperCase()
+            : value.toString().trim();
+        params.append('filterField', key);
+        params.append('filterValue', filterValue);
+        params.append('filterOperator', 'contains');
       }
-
-      console.log('Initial fetch with params:', params.toString());
-      setLoading(true);
-      
-      fetch(`${SERVER_URL}/api/permissions/full?${params.toString()}`)
-        .then(response => {
-          if (!response.ok) {
-            if (response.status === 404) {
-              setPermissions([]);
-              setTotalItems(0);
-              return null;
-            }
-            throw new Error(`Failed to fetch permissions: ${response.status}`);
+    });
+  
+    // Add sorting if available
+    if (sortModel.length > 0) {
+      params.append('sortField', sortModel[0].field);
+      params.append('sortOrder', sortModel[0].sort);
+    }
+  
+    console.log('Fetching permissions with params:', params.toString());
+    setLoading(true);
+  
+    const apiUrl = `${SERVER_URL}/api/permissions/full?${params.toString()}`;
+    console.log('Fetch API URL:', apiUrl);
+  
+    fetch(apiUrl)
+      .then(response => {
+        if (!response.ok) {
+          if (response.status === 404) {
+            setPermissions([]);
+            setTotalItems(0);
+            return null;
           }
-          return response.json();
-        })
-        .then(data => {
-          if (data) {
-            const formattedPermissions = data.items.map(permission => ({
-              id: permission.id,
-              name: permission.name || '',
-              description: permission.description || ''
-            }));
-            
-            setPermissions(formattedPermissions);
-            setTotalItems(data.total || 0);
-            setError(null);
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching permissions:', err);
-          setError(`Failed to load permissions: ${err.message}`);
-          setPermissions([]);
-          setTotalItems(0);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    };
-
-    initialFetch();
-  }, [paginationModel.page, paginationModel.pageSize, sortModel]);
+          throw new Error(`Failed to fetch permissions: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data) {
+          const formattedPermissions = data.items.map(permission => ({
+            id: permission.id,
+            name: permission.name || '',
+            description: permission.description || '',
+          }));
+          setPermissions(formattedPermissions);
+          setTotalItems(data.total || 0);
+          setError(null);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching permissions:', err);
+        setError(`Failed to load permissions: ${err.message}`);
+        setPermissions([]);
+        setTotalItems(0);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [paginationModel.page, paginationModel.pageSize, sortModel, filters]);
 
   const handleCreateClick = () => {
     setFormMode('create');
@@ -477,6 +489,7 @@ function PermissionIndex() {
         onSortModelChange={(newModel) => {
           console.log('Sort model changed:', newModel);
           setSortModel(newModel);
+          fetchData(filters);
         }}
         showQuickFilter={false}
         CustomFilterComponent={PermissionFilters}

@@ -43,6 +43,20 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
     // Initialize nextFilterId based on the number of active filters
     return activeFilters.length + 1;
   });
+  const [tempFilters, setTempFilters] = useState(() => {
+    const initialFilters = { ...filters };
+    // Ensure permission is always an array
+    if (!Array.isArray(initialFilters.permission)) {
+      initialFilters.permission = initialFilters.permission ? [initialFilters.permission] : [];
+    }
+    return initialFilters;
+  });
+  
+   // Update tempFilters when filters prop changes
+   useEffect(() => {
+    const updatedFilters = { ...filters };
+    setTempFilters(updatedFilters);
+  }, [filters]);
 
   // Update activeFilters when filters prop changes
   useEffect(() => {
@@ -79,29 +93,25 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
   };
 
   const handleRemoveFilter = (filterId) => {
-    const updatedFilters = activeFilters.filter(f => f.id !== filterId);
-    setActiveFilters(updatedFilters);
+    const updatedActiveFilters = activeFilters.filter(f => f.id !== filterId);
+    setActiveFilters(updatedActiveFilters);
     
-    // Clear the removed filter's value
     const removedFilter = activeFilters.find(f => f.id === filterId);
     if (removedFilter) {
-      const updatedFilterValues = { ...filters };
+      const updatedFilterValues = { ...tempFilters };
       delete updatedFilterValues[removedFilter.type];
-      onFiltersChange(updatedFilterValues);
+      setTempFilters(updatedFilterValues);
     }
   };
 
   const handleFilterChange = (filterId, value) => {
     const filter = activeFilters.find(f => f.id === filterId);
     if (filter) {
-      // Create a new filters object with the updated value
-      const updatedFilters = {
-        ...filters,
-        [filter.type]: value // Store the raw value, transform only when searching
+      const updatedTempFilters = {
+        ...tempFilters,
+        [filter.type]: value
       };
-      
-      console.log('Filter changed:', filter.type, value);
-      onFiltersChange(updatedFilters);
+      setTempFilters(updatedTempFilters);
     }
   };
 
@@ -115,12 +125,26 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
       f.id === filterId ? { ...f, type: newType } : f
     ));
     
-    // Clear the old filter value and set up the new filter
+    // Clear the old filter value
     if (oldType) {
-      const updatedFilterValues = { ...filters };
+      const updatedFilterValues = { ...tempFilters };
       delete updatedFilterValues[oldType];
-      onFiltersChange(updatedFilterValues);
+      setTempFilters(updatedFilterValues);
     }
+  };
+  const renderFilterInput = (filter) => {
+    const filterType = FILTER_TYPES[filter.type];
+    return (
+      <TextField
+        type={filterType.type}
+        label={filterType.label}
+        placeholder={filterType.placeholder}
+        size="small"
+        value={tempFilters[filter.type] || ''}
+        onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+        sx={{ flex: 1 }}
+      />
+    );
   };
 
   return (
@@ -161,15 +185,7 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
                 </Select>
               </FormControl>
 
-              <TextField
-                type={FILTER_TYPES[filter.type].type}
-                label={FILTER_TYPES[filter.type].label}
-                placeholder={FILTER_TYPES[filter.type].placeholder}
-                size="small"
-                value={filters[filter.type] || ''}
-                onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-                sx={{ flex: 1 }}
-              />
+              {renderFilterInput(filter)}
 
               <IconButton 
                 onClick={() => handleRemoveFilter(filter.id)}
@@ -182,20 +198,21 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
           ))}
         </Stack>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<SearchIcon />}
-            onClick={() => {
-              console.log('Search button clicked with filters:', filters);
-              if (onSearch) {
-                onSearch();
-              }
-            }}
-            sx={{ minWidth: 120 }}
-          >
-            Search
-          </Button>
+        <Button
+        variant="contained"
+        color="primary"
+        startIcon={<SearchIcon />}
+        onClick={() => {
+          console.log('Search button clicked with filters:', tempFilters);
+          onFiltersChange(tempFilters);
+          if (onSearch) {
+            onSearch(tempFilters);
+          }
+        }}
+        sx={{ minWidth: 120 }}
+       >
+        Search
+      </Button>
         </Box>
       </Stack>
     </Paper>
