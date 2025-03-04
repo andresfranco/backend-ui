@@ -1,28 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,Button,Tooltip} from '@mui/material';
-import {Search as SearchIcon,AddCircleOutline as AddFilterIcon,Close as CloseIcon} from '@mui/icons-material';
+import {
+  Box,
+  Paper,
+  Typography,
+  IconButton,
+  TextField,
+  Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Button,
+  Tooltip,
+  Slider
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  AddCircleOutline as AddFilterIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 
-// Filter type definitions with more specific handling
+// Filter type definitions
 const FILTER_TYPES = {
   name: {
-    label: 'Permission Name',
-    type: 'text',
-    placeholder: 'Search by permission name (e.g., CREATE_USER)'
+    label: 'Name',
+    type: 'text'
+  },
+  min_level: {
+    label: 'Minimum Level',
+    type: 'slider'
   },
   description: {
     label: 'Description',
-    type: 'text',
-    placeholder: 'Search by description'
-  },
-  id: {
-    label: 'ID',
-    type: 'number',
-    placeholder: 'Search by ID'
+    type: 'text'
   }
 };
 
-function PermissionFilters({ filters, onFiltersChange, onSearch }) {
-  // Initialize activeFilters based on the filters prop
+function SkillFilters({ filters, onFiltersChange, onSearch }) {
   const [activeFilters, setActiveFilters] = useState(() => {
     const initialFilters = [];
     let id = 1;
@@ -50,42 +64,13 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
   const [tempFilters, setTempFilters] = useState(() => {
     return { ...filters };
   });
-  
+
   // Update tempFilters when filters prop changes
   useEffect(() => {
     if (filters) {
-      const updatedFilters = { ...filters };
-      setTempFilters(updatedFilters);
+      setTempFilters({ ...filters });
     }
   }, [filters]);
-
-  // Update activeFilters when filters prop changes
-  useEffect(() => {
-    if (filters) {
-      const updatedFilters = [];
-      let id = 1;
-      
-      // Add active filters for non-empty filter values
-      Object.entries(filters).forEach(([type, value]) => {
-        if (FILTER_TYPES[type]) {
-          const hasValue = Boolean(value && value.toString().trim() !== '');
-          if (hasValue) {
-            updatedFilters.push({ id: id++, type });
-          }
-        }
-      });
-      
-      // If no active filters, add a default one
-      if (updatedFilters.length === 0) {
-        // Find the first available filter type
-        const firstType = Object.keys(FILTER_TYPES)[0];
-        updatedFilters.push({ id: id, type: firstType });
-      }
-      
-      setActiveFilters(updatedFilters);
-      setNextFilterId(id + 1);
-    }
-  }, []);
 
   const handleAddFilter = () => {
     const unusedFilterTypes = Object.keys(FILTER_TYPES).filter(type => 
@@ -109,7 +94,7 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
       setTempFilters(updatedFilterValues);
     }
   };
-
+  
   const handleFilterChange = (filterId, value) => {
     const filter = activeFilters.find(f => f.id === filterId);
     if (filter) {
@@ -120,7 +105,7 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
       setTempFilters(updatedTempFilters);
     }
   };
-
+  
   const handleFilterTypeChange = (filterId, newType) => {
     // Find the old filter type
     const oldFilter = activeFilters.find(f => f.id === filterId);
@@ -138,13 +123,13 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
       setTempFilters(updatedFilterValues);
     }
   };
-  
+
   const handleSearch = () => {
     // Create a clean copy of filters with only non-empty values
     const cleanFilters = {};
     
     Object.entries(tempFilters).forEach(([key, value]) => {
-      if (value && value.toString().trim() !== '') {
+      if (value !== undefined && value !== null && value.toString().trim() !== '') {
         cleanFilters[key] = value;
       }
     });
@@ -164,12 +149,31 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
 
   const renderFilterInput = (filter) => {
     const filterType = FILTER_TYPES[filter.type];
+    
+    if (filterType.type === 'slider' && filter.type === 'min_level') {
+      return (
+        <Box sx={{ flex: 1, px: 2 }}>
+          <Typography id={`min-level-slider-${filter.id}`} gutterBottom>
+            Minimum Level: {tempFilters[filter.type] || 0}%
+          </Typography>
+          <Slider
+            value={tempFilters[filter.type] || 0}
+            onChange={(e, newValue) => handleFilterChange(filter.id, newValue)}
+            aria-labelledby={`min-level-slider-${filter.id}`}
+            valueLabelDisplay="auto"
+            step={10}
+            marks
+            min={0}
+            max={100}
+          />
+        </Box>
+      );
+    }
+    
     return (
       <TextField
-        type={filterType.type}
+        fullWidth
         label={filterType.label}
-        placeholder={filterType.placeholder}
-        size="small"
         value={tempFilters[filter.type] || ''}
         onChange={(e) => handleFilterChange(filter.id, e.target.value)}
         sx={{ flex: 1 }}
@@ -183,35 +187,26 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Filters
         </Typography>
-        {Object.keys(FILTER_TYPES).length > activeFilters.length ? (
-          <Tooltip title="Add Filter">
-            <IconButton 
-              onClick={handleAddFilter} 
-              color="primary"
-            >
-              <AddFilterIcon />
-            </IconButton>
-          </Tooltip>
-        ) : (
+        <Tooltip title="Add Filter">
           <IconButton 
-            disabled
-            sx={{ color: 'action.disabled' }}
+            onClick={handleAddFilter} 
+            disabled={Object.keys(FILTER_TYPES).length <= activeFilters.length}
+            color="primary"
           >
             <AddFilterIcon />
           </IconButton>
-        )}
+        </Tooltip>
       </Box>
       
       <Stack spacing={2}>
         {activeFilters.map((filter) => (
           <Box key={filter.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FormControl sx={{ width: 150 }} size="small">
+            <FormControl sx={{ width: 150 }}>
               <InputLabel>Filter Type</InputLabel>
               <Select
                 value={filter.type}
                 onChange={(e) => handleFilterTypeChange(filter.id, e.target.value)}
                 label="Filter Type"
-                size="small"
               >
                 {Object.entries(FILTER_TYPES).map(([type, config]) => (
                   <MenuItem 
@@ -227,24 +222,16 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
             
             {renderFilterInput(filter)}
             
-            {activeFilters.length > 1 ? (
-              <Tooltip title="Remove Filter">
-                <IconButton 
-                  onClick={() => handleRemoveFilter(filter.id)}
-                  color="error"
-                  sx={{ flexShrink: 0 }}
-                >
-                  <CloseIcon />
-                </IconButton>
-              </Tooltip>
-            ) : (
+            <Tooltip title="Remove Filter">
               <IconButton 
-                disabled
-                sx={{ flexShrink: 0, color: 'action.disabled' }}
+                onClick={() => handleRemoveFilter(filter.id)}
+                disabled={activeFilters.length <= 1}
+                color="error"
+                sx={{ flexShrink: 0 }}
               >
                 <CloseIcon />
               </IconButton>
-            )}
+            </Tooltip>
           </Box>
         ))}
         
@@ -263,4 +250,4 @@ function PermissionFilters({ filters, onFiltersChange, onSearch }) {
   );
 }
 
-export default PermissionFilters;
+export default SkillFilters;

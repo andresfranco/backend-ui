@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import PermissionForm from './PermissionForm';
 import ReusableDataGrid from '../common/ReusableDataGrid';
 import PermissionFilters from './PermissionFilters';
+import SERVER_URL from '../common/BackendServerData';
 
 function PermissionIndex() {
   const [filters, setFilters] = useState({
@@ -15,6 +16,34 @@ function PermissionIndex() {
   const [formMode, setFormMode] = useState(null);
   const [selectedPermission, setSelectedPermission] = useState(null);
   const [gridKey, setGridKey] = useState(0);
+  const [error, setError] = useState(null);
+
+  // Check if the permissions endpoint is accessible
+  useEffect(() => {
+    const checkPermissionsEndpoint = async () => {
+      try {
+        const response = await fetch(`${SERVER_URL}/api/permissions/full?page=1&pageSize=10`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to access permissions endpoint: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Permissions data:', data);
+      } catch (err) {
+        console.error('Error checking permissions endpoint:', err);
+        setError(err.message);
+      }
+    };
+    
+    checkPermissionsEndpoint();
+  }, []);
 
   // Define columns for the grid
   const columns = [

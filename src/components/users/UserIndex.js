@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import UserForm from './UserForm';
@@ -17,6 +17,30 @@ function UserIndex() {
   const [formMode, setFormMode] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [gridKey, setGridKey] = useState(0); // Used to force grid refresh
+
+  // Check if the users endpoint is accessible
+  useEffect(() => {
+    const checkUsersEndpoint = async () => {
+      try {
+        console.log('Checking users endpoint accessibility');
+        const response = await fetch(`${SERVER_URL}/api/users/full`, {
+          credentials: 'include'
+        });
+        console.log('Users endpoint status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Users endpoint data:', data);
+        } else {
+          console.error('Users endpoint not accessible. Status:', response.status);
+        }
+      } catch (error) {
+        console.error('Error checking users endpoint:', error);
+      }
+    };
+    
+    checkUsersEndpoint();
+  }, []);
 
   // Define columns for the grid
   const columns = [

@@ -17,11 +17,16 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const response = await fetch(`${SERVER_URL}/api/roles/full`);
+        console.log('Fetching roles from:', `${SERVER_URL}/api/roles/full`);
+        const response = await fetch(`${SERVER_URL}/api/roles/full`, {
+          credentials: 'include'
+        });
         if (!response.ok) {
+          console.error('Failed to fetch roles. Status:', response.status);
           throw new Error('Failed to fetch roles');
         }
         const data = await response.json();
+        console.log('Roles data received:', data);
         setAvailableRoles(data.items || []);
       } catch (error) {
         console.error('Error fetching roles:', error);
@@ -113,13 +118,17 @@ function UserForm({ open, onClose, user, onSubmit, mode = 'create' }) {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: method !== 'DELETE' ? JSON.stringify(body) : undefined
       });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error(`Failed to ${mode} user. Status:`, response.status, 'Error:', errorData);
         throw new Error(errorData.message || `Failed to ${mode} user: ${response.status}`);
       }
+      
+      console.log(`User ${mode}d successfully`);
       
       // Call onSubmit to notify parent component
       if (onSubmit) {

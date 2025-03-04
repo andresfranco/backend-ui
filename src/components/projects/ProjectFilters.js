@@ -1,24 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { Box,Paper,Typography,IconButton,TextField,Stack,Select,MenuItem,FormControl,InputLabel,Button,Tooltip,Chip,OutlinedInput} from '@mui/material';
-import {Search as SearchIcon,AddCircleOutline as AddFilterIcon,Close as CloseIcon} from '@mui/icons-material';
+import {
+  Box,
+  Paper,
+  Typography,
+  IconButton,
+  TextField,
+  Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Button,
+  Tooltip
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  AddCircleOutline as AddFilterIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 import SERVER_URL from '../common/BackendServerData';
+
 // Filter type definitions
 const FILTER_TYPES = {
-  username: {
-    label: 'Username',
+  title: {
+    label: 'Title',
     type: 'text'
   },
-  email: {
-    label: 'Email',
-    type: 'text'
+  section_id: {
+    label: 'Section',
+    type: 'select'
   },
-  roles: {
-    label: 'Roles',
-    type: 'multiselect'
+  category_id: {
+    label: 'Category',
+    type: 'select'
+  },
+  skill_id: {
+    label: 'Skill',
+    type: 'select'
   }
 };
 
-function UserFilters({ filters, onFiltersChange, onSearch }) {
+function ProjectFilters({ filters, onFiltersChange, onSearch }) {
   const [activeFilters, setActiveFilters] = useState(() => {
     const initialFilters = [];
     let id = 1;
@@ -32,83 +54,72 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
     
     // If no filters were created, add a default one
     if (initialFilters.length === 0) {
-      initialFilters.push({ id: id, type: 'username' });
+      initialFilters.push({ id: id, type: 'title' });
     }
     
     return initialFilters;
-  }); 
+  });
+  
   const [nextFilterId, setNextFilterId] = useState(() => {
     // Initialize nextFilterId based on the number of active filters
     return activeFilters.length + 1;
   });
-  const [availableRoles, setAvailableRoles] = useState([]);
+  
   const [tempFilters, setTempFilters] = useState(() => {
-    const initialFilters = { ...filters };
-    // Ensure roles is always an array
-    if (!Array.isArray(initialFilters.roles)) {
-      initialFilters.roles = initialFilters.roles ? [initialFilters.roles] : [];
-    }
-    return initialFilters;
+    return { ...filters };
   });
+  
+  const [availableSections, setAvailableSections] = useState([]);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [availableSkills, setAvailableSkills] = useState([]);
 
-  // Fetch roles for the dropdown
+  // Fetch available sections, categories, and skills
   useEffect(() => {
-    const fetchRoles = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`${SERVER_URL}/api/roles/full`);
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableRoles(data.items || []);
-        } else {
-          console.error('Failed to fetch roles');
+        // Fetch sections
+        const sectionsResponse = await fetch(`${SERVER_URL}/api/sections`, {
+          credentials: 'include'
+        });
+        if (!sectionsResponse.ok) {
+          throw new Error('Failed to fetch sections');
         }
+        const sectionsData = await sectionsResponse.json();
+        setAvailableSections(sectionsData.items || []);
+
+        // Fetch categories
+        const categoriesResponse = await fetch(`${SERVER_URL}/api/categories`, {
+          credentials: 'include'
+        });
+        if (!categoriesResponse.ok) {
+          throw new Error('Failed to fetch categories');
+        }
+        const categoriesData = await categoriesResponse.json();
+        setAvailableCategories(categoriesData.items || []);
+
+        // Fetch skills
+        const skillsResponse = await fetch(`${SERVER_URL}/api/skills`, {
+          credentials: 'include'
+        });
+        if (!skillsResponse.ok) {
+          throw new Error('Failed to fetch skills');
+        }
+        const skillsData = await skillsResponse.json();
+        setAvailableSkills(skillsData.items || []);
       } catch (error) {
-        console.error('Error fetching roles:', error);
+        console.error('Error fetching filter data:', error);
       }
     };
 
-    fetchRoles();
+    fetchData();
   }, []);
 
   // Update tempFilters when filters prop changes
   useEffect(() => {
     if (filters) {
-      const updatedFilters = { ...filters };
-      // Ensure roles is always an array
-      if (!Array.isArray(updatedFilters.roles)) {
-        updatedFilters.roles = updatedFilters.roles ? [updatedFilters.roles] : [];
-      }
-      setTempFilters(updatedFilters);
+      setTempFilters({ ...filters });
     }
   }, [filters]);
-
-  // Update activeFilters when filters prop changes
-  useEffect(() => {
-    if (filters) {
-      const updatedFilters = [];
-      let id = 1;
-      
-      // Add active filters for non-empty filter values
-      Object.entries(filters).forEach(([type, value]) => {
-        if (FILTER_TYPES[type]) {
-          const hasValue = Array.isArray(value) ? value.length > 0 : Boolean(value);
-          if (hasValue) {
-            updatedFilters.push({ id: id++, type });
-          }
-        }
-      });
-      
-      // If no active filters, add a default one
-      if (updatedFilters.length === 0) {
-        // Find the first available filter type
-        const firstType = Object.keys(FILTER_TYPES)[0];
-        updatedFilters.push({ id: id, type: firstType });
-      }
-      
-      setActiveFilters(updatedFilters);
-      setNextFilterId(id + 1);
-    }
-  }, []);
 
   const handleAddFilter = () => {
     const unusedFilterTypes = Object.keys(FILTER_TYPES).filter(type => 
@@ -167,11 +178,7 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
     const cleanFilters = {};
     
     Object.entries(tempFilters).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        if (value.length > 0) {
-          cleanFilters[key] = value;
-        }
-      } else if (value && value.toString().trim() !== '') {
+      if (value && value.toString().trim() !== '') {
         cleanFilters[key] = value;
       }
     });
@@ -192,34 +199,59 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
   const renderFilterInput = (filter) => {
     const filterType = FILTER_TYPES[filter.type];
     
-    if (filterType.type === 'multiselect' && filter.type === 'roles') {
-      return (
-        <FormControl sx={{ flex: 1 }}>
-          <InputLabel>Select Roles</InputLabel>
-          <Select
-            multiple
-            value={tempFilters[filter.type] || []}
-            onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-            input={<OutlinedInput label="Select Roles" />}
-            renderValue={(selected) => (
-              <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                {selected.map((roleId) => {
-                  const role = availableRoles.find(r => r.id === roleId);
-                  return role ? (
-                    <Chip key={roleId} label={role.name} size="small" sx={{ m: 0.5 }} />
-                  ) : null;
-                })}
-              </Stack>
-            )}
-          >
-            {availableRoles.map((role) => (
-              <MenuItem key={role.id} value={role.id}>
-                {role.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      );
+    if (filterType.type === 'select') {
+      if (filter.type === 'section_id') {
+        return (
+          <FormControl sx={{ flex: 1 }}>
+            <InputLabel>Select Section</InputLabel>
+            <Select
+              value={tempFilters[filter.type] || ''}
+              onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+              label="Select Section"
+            >
+              {availableSections.map((section) => (
+                <MenuItem key={section.id} value={section.id}>
+                  {section.title}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        );
+      } else if (filter.type === 'category_id') {
+        return (
+          <FormControl sx={{ flex: 1 }}>
+            <InputLabel>Select Category</InputLabel>
+            <Select
+              value={tempFilters[filter.type] || ''}
+              onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+              label="Select Category"
+            >
+              {availableCategories.map((category) => (
+                <MenuItem key={category.id} value={category.id}>
+                  {category.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        );
+      } else if (filter.type === 'skill_id') {
+        return (
+          <FormControl sx={{ flex: 1 }}>
+            <InputLabel>Select Skill</InputLabel>
+            <Select
+              value={tempFilters[filter.type] || ''}
+              onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+              label="Select Skill"
+            >
+              {availableSkills.map((skill) => (
+                <MenuItem key={skill.id} value={skill.id}>
+                  {skill.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        );
+      }
     }
     
     return (
@@ -233,77 +265,21 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
     );
   };
 
-  const renderSearchButton = () => {
-    const isDisabled = activeFilters.length === 0;
-    
-    if (isDisabled) {
-      // Render just the button without a Tooltip when disabled
-      return (
-        <Button
-          variant="contained"
-          startIcon={<SearchIcon />}
-          disabled={true}
-          sx={{ minWidth: '100px' }}
-        >
-          Search
-        </Button>
-      );
-    } else {
-      // Wrap with Tooltip only when the button is enabled
-      return (
-        <Tooltip title="Search with current filters">
-          <Button
-            variant="contained"
-            startIcon={<SearchIcon />}
-            onClick={handleSearch}
-            sx={{ minWidth: '100px' }}
-          >
-            Search
-          </Button>
-        </Tooltip>
-      );
-    }
-  };
-
-  const renderAddFilterButton = () => {
-    const isDisabled = Object.keys(FILTER_TYPES).length === activeFilters.length;
-    
-    if (isDisabled) {
-      // Render just the button without a Tooltip when disabled
-      return (
-        <Button
-          variant="outlined"
-          startIcon={<AddFilterIcon />}
-          disabled={true}
-          sx={{ ml: 1 }}
-        >
-          Add Filter
-        </Button>
-      );
-    } else {
-      // Wrap with Tooltip only when the button is enabled
-      return (
-        <Tooltip title="Add another filter">
-          <Button
-            variant="outlined"
-            startIcon={<AddFilterIcon />}
-            onClick={handleAddFilter}
-            sx={{ ml: 1 }}
-          >
-            Add Filter
-          </Button>
-        </Tooltip>
-      );
-    }
-  };
-
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Filters
         </Typography>
-        {renderAddFilterButton()}
+        <Tooltip title="Add Filter">
+          <IconButton 
+            onClick={handleAddFilter} 
+            disabled={Object.keys(FILTER_TYPES).length <= activeFilters.length}
+            color="primary"
+          >
+            <AddFilterIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
       
       <Stack spacing={2}>
@@ -344,11 +320,18 @@ function UserFilters({ filters, onFiltersChange, onSearch }) {
         ))}
         
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-          {renderSearchButton()}
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleSearch}
+            startIcon={<SearchIcon />}
+          >
+            Search
+          </Button>
         </Box>
       </Stack>
     </Paper>
   );
 }
 
-export default UserFilters;
+export default ProjectFilters;

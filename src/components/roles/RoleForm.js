@@ -12,16 +12,17 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
   const [apiError, setApiError] = useState('');
   const [availablePermissions, setAvailablePermissions] = useState([]);
 
-  // Fetch available permissions
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
-        const response = await fetch(`${SERVER_URL}/api/permissions/full`);
+        const response = await fetch(`${SERVER_URL}/api/permissions/`, {
+          credentials: 'include'
+        });
         if (!response.ok) {
           throw new Error('Failed to fetch permissions');
         }
         const data = await response.json();
-        setAvailablePermissions(data.items || []);
+        setAvailablePermissions(data || []);
       } catch (error) {
         console.error('Error fetching permissions:', error);
         setApiError('Failed to load permissions');
@@ -31,34 +32,21 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
     fetchPermissions();
   }, []);
   
-  // Reset form when role changes
   useEffect(() => {
     if (mode === 'create') {
-      // In create mode, start with an empty form
       setFormData({
         name: '',
         description: '',
         permissions: []
       });
     } else if (role) {
-      // For edit or other modes, load role data if available
       setFormData({
         name: role.name || '',
         description: role.description || '',
-        permissions: Array.isArray(role.permissions)
-          ? role.permissions
-          : []
-      });
-    } else {
-      // If no role is provided, ensure the form is cleared
-      setFormData({
-        name: '',
-        description: '',
-        permissions: []
+        permissions: Array.isArray(role.permissions) ? role.permissions : []
       });
     }
   }, [role, mode]);
-  
 
   const validateForm = () => {
     const newErrors = {};
@@ -83,46 +71,31 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
       return;
     }
     
-    // Log the form data being submitted
-    console.log('Submitting role with permissions:', formData.permissions);
-    
-    // Create a copy of the form data to ensure we're not modifying the original
-    const submissionData = {
-      ...formData,
-      // Ensure permissions is an array of strings
-      permissions: Array.isArray(formData.permissions) ? formData.permissions : []
-    };
-    
-    console.log('Final submission data:', submissionData);
-    
     try {
-      let url, method;
+      const endpoint = mode === 'create' 
+        ? `${SERVER_URL}/api/roles/` 
+        : `${SERVER_URL}/api/roles/${role?.id}`;
+        
+      const method = mode === 'create' ? 'POST' : mode === 'edit' ? 'PUT' : 'DELETE';
       
-      if (mode === 'create') {
-        url = `${SERVER_URL}/api/roles/`;
-        method = 'POST';
-      } else if (mode === 'edit') {
-        url = `${SERVER_URL}/api/roles/${role.id}`;
-        method = 'PUT';
-      } else if (mode === 'delete') {
-        url = `${SERVER_URL}/api/roles/${role.id}`;
-        method = 'DELETE';
-      }
-      
-      const response = await fetch(url, {
+      const response = await fetch(endpoint, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: method !== 'DELETE' ? JSON.stringify(submissionData) : undefined,
+        credentials: 'include',
+        body: method !== 'DELETE' ? JSON.stringify({
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+          permissions: formData.permissions
+        }) : undefined,
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Failed to ${mode} role: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to ${mode} role`);
       }
       
-      // Close the form and refresh data
       onClose(true);
     } catch (error) {
       console.error(`Error ${mode}ing role:`, error);
@@ -137,10 +110,7 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
       [name]: value
     }));
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -150,12 +120,8 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
       ...prev,
       permissions: selectedPermissions
     }));
-
     if (errors.permissions) {
-      setErrors(prev => ({
-        ...prev,
-        permissions: ''
-      }));
+      setErrors(prev => ({ ...prev, permissions: '' }));
     }
   };
 
@@ -196,7 +162,7 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
               error={!!errors.description}
               helperText={errors.description}
               multiline
-              rows={3}
+              rows={2}
               disabled={mode === 'delete'}
             />
             <FormControl fullWidth error={!!errors.permissions}>
@@ -206,59 +172,42 @@ function RoleForm({ open, onClose, role, onSubmit, mode = 'create' }) {
                 name="permissions"
                 value={formData.permissions}
                 onChange={handlePermissionChange}
-                label="Permissions"
-                disabled={mode === 'delete'}
                 renderValue={(selected) => (
                   <Stack direction="row" spacing={0.5} flexWrap="wrap" gap={0.5}>
-                    {selected.map((permissionName) => (
-                      <Chip 
-                        key={permissionName} 
-                        label={permissionName} 
-                        size="small" 
-                      />
+                    {selected.map((value) => (
+                      <Chip key={value} label={value} size="small" />
                     ))}
                   </Stack>
                 )}
+                disabled={mode === 'delete'}
               >
                 {availablePermissions.map((permission) => (
-                  <MenuItem key={permission.id} value={permission.name}>
-                    <Typography variant="body2">{permission.name}</Typography>
-                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
-                      {permission.description}
-                    </Typography>
+                  <MenuItem key={permission} value={permission}>
+                    {permission}
                   </MenuItem>
                 ))}
               </Select>
               {errors.permissions && (
-                <Typography variant="caption" color="error">
+                <Typography color="error" variant="caption">
                   {errors.permissions}
                 </Typography>
               )}
             </FormControl>
             {mode === 'delete' && (
-              <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+              <Typography color="error">
                 Are you sure you want to delete this role? This action cannot be undone.
+                {role?.users_count > 0 && (
+                  <strong> Warning: This role is assigned to {role.users_count} users.</strong>
+                )}
               </Typography>
             )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions>
+          <Button onClick={() => onClose(false)}>Cancel</Button>
           <Button 
-            onClick={() => onClose(false)}
-            variant="contained"
-            sx={{ 
-              bgcolor: 'grey.300',
-              color: 'grey.800',
-              '&:hover': {
-                bgcolor: 'grey.400'
-              }
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
+            type="submit" 
+            variant="contained" 
             color={mode === 'delete' ? 'error' : 'primary'}
           >
             {mode === 'create' ? 'Create' : mode === 'edit' ? 'Save' : 'Delete'}

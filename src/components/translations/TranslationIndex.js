@@ -1,52 +1,43 @@
 import React, { useState, useCallback } from 'react';
-import { Box, IconButton, Tooltip, Chip } from '@mui/material';
+import { Box, IconButton, Tooltip, Chip, Stack } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import RoleForm from './RoleForm';
+import TranslationForm from './TranslationForm';
 import ReusableDataGrid from '../common/ReusableDataGrid';
-import RoleFilters from './RoleFilters';
+import TranslationFilters from './TranslationFilters';
 import SERVER_URL from '../common/BackendServerData';
 
-function RoleIndex() {
+function TranslationIndex() {
   const [filters, setFilters] = useState({
-    name: '',
-    description: '',
-    permission: []
+    identifier: '',
+    language_id: ''
   });
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState(null);
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [gridKey, setGridKey] = useState(0);
+  const [selectedTranslation, setSelectedTranslation] = useState(null);
+  const [gridKey, setGridKey] = useState(0); // Used to force grid refresh
 
+  // Define columns for the grid
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'name', headerName: 'Role Name', flex: 1 },
-    { field: 'description', headerName: 'Description', flex: 2 },
-    {
-      field: 'permissions',
-      headerName: 'Permissions',
-      flex: 2,
+    { field: 'identifier', headerName: 'Identifier', flex: 1 },
+    { 
+      field: 'languages', 
+      headerName: 'Languages', 
+      flex: 1,
       renderCell: (params) => {
-        const permissions = Array.isArray(params.value) ? params.value : [];
+        const languages = params.value || [];
         return (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {permissions.slice(0, 3).map((permission) => (
+          <Stack direction="row" spacing={0.5} flexWrap="wrap">
+            {languages.map(lang => (
               <Chip 
-                key={permission} 
-                label={permission} 
+                key={lang.id} 
+                label={`${lang.name} (${lang.code})`} 
                 size="small" 
-                variant="outlined"
+                sx={{ m: 0.5 }}
               />
             ))}
-            {permissions.length > 3 && (
-              <Chip 
-                label={`+${permissions.length - 3} more`} 
-                size="small" 
-                variant="outlined" 
-                color="primary"
-              />
-            )}
-          </Box>
+          </Stack>
         );
       }
     },
@@ -57,12 +48,12 @@ function RoleIndex() {
       sortable: false,
       renderCell: (params) => (
         <Box>
-          <Tooltip title="Edit Role">
+          <Tooltip title="Edit Translation">
             <IconButton onClick={() => handleEditClick(params.row)} size="small">
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Delete Role">
+          <Tooltip title="Delete Translation">
             <IconButton onClick={() => handleDeleteClick(params.row)} size="small" color="error">
               <DeleteIcon fontSize="small" />
             </IconButton>
@@ -72,31 +63,37 @@ function RoleIndex() {
     }
   ];
 
+  // Handle create button click
   const handleCreateClick = () => {
-    setSelectedRole(null);
+    setSelectedTranslation(null);
     setFormMode('create');
     setIsFormOpen(true);
   };
 
-  const handleEditClick = (role) => {
-    setSelectedRole(role);
+  // Handle edit button click
+  const handleEditClick = (translation) => {
+    setSelectedTranslation(translation);
     setFormMode('edit');
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (role) => {
-    setSelectedRole(role);
+  // Handle delete button click
+  const handleDeleteClick = (translation) => {
+    setSelectedTranslation(translation);
     setFormMode('delete');
     setIsFormOpen(true);
   };
 
+  // Handle form close
   const handleFormClose = (refreshData) => {
     setIsFormOpen(false);
     if (refreshData) {
+      // Refresh the grid by incrementing the key
       setGridKey(prevKey => prevKey + 1);
     }
   };
 
+  // Handle filter changes
   const handleFiltersChange = useCallback((newFilters) => {
     setFilters(newFilters);
   }, []);
@@ -104,23 +101,23 @@ function RoleIndex() {
   return (
     <Box sx={{ height: '100%', width: '100%', p: 2 }}>
       <ReusableDataGrid
-        key={gridKey}
-        title="Roles Management"
+        key={gridKey} // Force refresh when key changes
+        title="Translations Management"
         columns={columns}
-        apiEndpoint="/api/roles/full"
+        apiEndpoint="/api/translations"
         initialFilters={filters}
-        FiltersComponent={RoleFilters}
-        createButtonText="Role"
+        FiltersComponent={TranslationFilters}
+        createButtonText="Translation"
         onCreateClick={handleCreateClick}
         onEditClick={handleEditClick}
         onDeleteClick={handleDeleteClick}
       />
 
       {isFormOpen && (
-        <RoleForm
+        <TranslationForm
           open={isFormOpen}
           onClose={handleFormClose}
-          role={selectedRole}
+          translation={selectedTranslation}
           mode={formMode}
         />
       )}
@@ -128,4 +125,4 @@ function RoleIndex() {
   );
 }
 
-export default RoleIndex;
+export default TranslationIndex;

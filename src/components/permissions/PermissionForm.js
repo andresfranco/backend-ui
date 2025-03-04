@@ -27,8 +27,6 @@ function PermissionForm({ open, onClose, permission, mode = 'create' }) {
     }
   }, [permission, mode]);
   
-  
-
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) {
@@ -65,11 +63,14 @@ function PermissionForm({ open, onClose, permission, mode = 'create' }) {
         method = 'DELETE';
       }
       
+      console.log(`Sending ${method} request to ${url}`, formData);
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: method !== 'DELETE' ? JSON.stringify(formData) : undefined,
       });
       

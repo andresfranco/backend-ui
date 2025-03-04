@@ -246,21 +246,77 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
     );
   };
 
+  const renderSearchButton = () => {
+    const isDisabled = activeFilters.length === 0;
+    
+    if (isDisabled) {
+      // Render just the button without a Tooltip when disabled
+      return (
+        <Button
+          variant="contained"
+          startIcon={<SearchIcon />}
+          disabled={true}
+          sx={{ minWidth: '100px' }}
+        >
+          Search
+        </Button>
+      );
+    } else {
+      // Wrap with Tooltip only when the button is enabled
+      return (
+        <Tooltip title="Search with current filters">
+          <Button
+            variant="contained"
+            startIcon={<SearchIcon />}
+            onClick={handleSearch}
+            sx={{ minWidth: '100px' }}
+          >
+            Search
+          </Button>
+        </Tooltip>
+      );
+    }
+  };
+
+  const renderAddFilterButton = () => {
+    const isDisabled = Object.keys(FILTER_TYPES).length === activeFilters.length;
+    
+    if (isDisabled) {
+      // Render just the button without a Tooltip when disabled
+      return (
+        <Button
+          variant="outlined"
+          startIcon={<AddFilterIcon />}
+          disabled={true}
+          sx={{ ml: 1 }}
+        >
+          Add Filter
+        </Button>
+      );
+    } else {
+      // Wrap with Tooltip only when the button is enabled
+      return (
+        <Tooltip title="Add another filter">
+          <Button
+            variant="outlined"
+            startIcon={<AddFilterIcon />}
+            onClick={handleAddFilter}
+            sx={{ ml: 1 }}
+          >
+            Add Filter
+          </Button>
+        </Tooltip>
+      );
+    }
+  };
+
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Filters
         </Typography>
-        <Tooltip title="Add Filter">
-          <IconButton 
-            onClick={handleAddFilter} 
-            disabled={Object.keys(FILTER_TYPES).length <= activeFilters.length}
-            color="primary"
-          >
-            <AddFilterIcon />
-          </IconButton>
-        </Tooltip>
+        {renderAddFilterButton()}
       </Box>
       
       <Stack spacing={2}>
@@ -303,15 +359,7 @@ function RoleFilters({ filters, onFiltersChange, onSearch }) {
         ))}
         
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            onClick={handleSearch}
-            startIcon={<SearchIcon />}
-            size="small"
-          >
-            Search
-          </Button>
+          {renderSearchButton()}
         </Box>
       </Stack>
     </Paper>

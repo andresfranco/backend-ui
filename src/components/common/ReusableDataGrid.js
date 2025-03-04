@@ -126,7 +126,20 @@ function ReusableDataGrid({
       .then(responseData => {
         if (responseData) {
           console.log('Data received:', responseData);
-          setData(responseData.items || []);
+          
+          // Ensure items is an array
+          const items = responseData.items || [];
+          
+          // Add unique id if not present
+          const processedItems = items.map(item => {
+            if (!item.id && item.name) {
+              // If no id but has name, use name as fallback id
+              return { ...item, id: `name-${item.name}` };
+            }
+            return item;
+          });
+          
+          setData(processedItems);
           setTotalItems(responseData.total || 0);
           setError(null);
         }

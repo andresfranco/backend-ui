@@ -1,55 +1,26 @@
 import React, { useState, useCallback } from 'react';
-import { Box, IconButton, Tooltip, Chip } from '@mui/material';
+import { Box, IconButton, Tooltip } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import RoleForm from './RoleForm';
+import CategoryForm from './CategoryForm';
 import ReusableDataGrid from '../common/ReusableDataGrid';
-import RoleFilters from './RoleFilters';
+import CategoryFilters from './CategoryFilters';
 import SERVER_URL from '../common/BackendServerData';
 
-function RoleIndex() {
+function CategoryIndex() {
   const [filters, setFilters] = useState({
-    name: '',
-    description: '',
-    permission: []
+    name: ''
   });
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState(null);
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [gridKey, setGridKey] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [gridKey, setGridKey] = useState(0); // Used to force grid refresh
 
+  // Define columns for the grid
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'name', headerName: 'Role Name', flex: 1 },
+    { field: 'name', headerName: 'Name', flex: 1 },
     { field: 'description', headerName: 'Description', flex: 2 },
-    {
-      field: 'permissions',
-      headerName: 'Permissions',
-      flex: 2,
-      renderCell: (params) => {
-        const permissions = Array.isArray(params.value) ? params.value : [];
-        return (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {permissions.slice(0, 3).map((permission) => (
-              <Chip 
-                key={permission} 
-                label={permission} 
-                size="small" 
-                variant="outlined"
-              />
-            ))}
-            {permissions.length > 3 && (
-              <Chip 
-                label={`+${permissions.length - 3} more`} 
-                size="small" 
-                variant="outlined" 
-                color="primary"
-              />
-            )}
-          </Box>
-        );
-      }
-    },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -57,12 +28,12 @@ function RoleIndex() {
       sortable: false,
       renderCell: (params) => (
         <Box>
-          <Tooltip title="Edit Role">
+          <Tooltip title="Edit Category">
             <IconButton onClick={() => handleEditClick(params.row)} size="small">
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Delete Role">
+          <Tooltip title="Delete Category">
             <IconButton onClick={() => handleDeleteClick(params.row)} size="small" color="error">
               <DeleteIcon fontSize="small" />
             </IconButton>
@@ -72,31 +43,37 @@ function RoleIndex() {
     }
   ];
 
+  // Handle create button click
   const handleCreateClick = () => {
-    setSelectedRole(null);
+    setSelectedCategory(null);
     setFormMode('create');
     setIsFormOpen(true);
   };
 
-  const handleEditClick = (role) => {
-    setSelectedRole(role);
+  // Handle edit button click
+  const handleEditClick = (category) => {
+    setSelectedCategory(category);
     setFormMode('edit');
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (role) => {
-    setSelectedRole(role);
+  // Handle delete button click
+  const handleDeleteClick = (category) => {
+    setSelectedCategory(category);
     setFormMode('delete');
     setIsFormOpen(true);
   };
 
+  // Handle form close
   const handleFormClose = (refreshData) => {
     setIsFormOpen(false);
     if (refreshData) {
+      // Refresh the grid by incrementing the key
       setGridKey(prevKey => prevKey + 1);
     }
   };
 
+  // Handle filter changes
   const handleFiltersChange = useCallback((newFilters) => {
     setFilters(newFilters);
   }, []);
@@ -104,23 +81,23 @@ function RoleIndex() {
   return (
     <Box sx={{ height: '100%', width: '100%', p: 2 }}>
       <ReusableDataGrid
-        key={gridKey}
-        title="Roles Management"
+        key={gridKey} // Force refresh when key changes
+        title="Categories Management"
         columns={columns}
-        apiEndpoint="/api/roles/full"
+        apiEndpoint="/api/categories"
         initialFilters={filters}
-        FiltersComponent={RoleFilters}
-        createButtonText="Role"
+        FiltersComponent={CategoryFilters}
+        createButtonText="Category"
         onCreateClick={handleCreateClick}
         onEditClick={handleEditClick}
         onDeleteClick={handleDeleteClick}
       />
 
       {isFormOpen && (
-        <RoleForm
+        <CategoryForm
           open={isFormOpen}
           onClose={handleFormClose}
-          role={selectedRole}
+          category={selectedCategory}
           mode={formMode}
         />
       )}
@@ -128,4 +105,4 @@ function RoleIndex() {
   );
 }
 
-export default RoleIndex;
+export default CategoryIndex;
